@@ -14,16 +14,21 @@ data "aws_ami" "amazon_linux_2" {
   }
 }
 
-# Key Pair (você precisa gerar uma chave SSH antes)
+# Key Pair
 resource "aws_key_pair" "main" {
-  key_name   = "${var.project_name}-key"
-  public_key = file("~/.ssh/aws_key.pub")
+  key_name   = "${var.project_name}-${var.environment}-key"
+  public_key = var.ssh_public_key != "" ? var.ssh_public_key : file("~/.ssh/aws_key.pub")
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-key"
+    Environment = var.environment
+  }
 }
 
 # EC2 Instance
 resource "aws_instance" "app" {
   ami           = data.aws_ami.amazon_linux_2.id
-  instance_type = "t2.micro" # Free tier
+  instance_type = var.environment == "prod" ? "t3.small" : "t2.micro"
 
   subnet_id                   = aws_subnet.public.id
   vpc_security_group_ids      = [aws_security_group.ec2.id]
@@ -50,7 +55,8 @@ resource "aws_instance" "app" {
               EOF
 
   tags = {
-    Name = "${var.project_name}-app-server"
+    Name        = "${var.project_name}-${var.environment}-app-server"
+    Environment = var.environment
   }
 }
 

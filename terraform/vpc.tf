@@ -5,7 +5,8 @@ resource "aws_vpc" "main" {
   enable_dns_support   = true
 
   tags = {
-    Name = "${var.project_name}-vpc"
+    Name        = "${var.project_name}-${var.environment}-vpc"
+    Environment = var.environment
   }
 }
 
@@ -14,7 +15,8 @@ resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.project_name}-igw"
+    Name        = "${var.project_name}-${var.environment}-igw"
+    Environment = var.environment
   }
 }
 
@@ -26,7 +28,8 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = {
-    Name = "${var.project_name}-public-subnet"
+    Name        = "${var.project_name}-${var.environment}-public-subnet"
+    Environment = var.environment
   }
 }
 
@@ -37,7 +40,8 @@ resource "aws_subnet" "private_1" {
   availability_zone = "${var.aws_region}a"
 
   tags = {
-    Name = "${var.project_name}-private-subnet-1"
+    Name        = "${var.project_name}-${var.environment}-private-subnet-1"
+    Environment = var.environment
   }
 }
 
@@ -48,7 +52,8 @@ resource "aws_subnet" "private_2" {
   availability_zone = "${var.aws_region}b"
 
   tags = {
-    Name = "${var.project_name}-private-subnet-2"
+    Name        = "${var.project_name}-${var.environment}-private-subnet-2"
+    Environment = var.environment
   }
 }
 
@@ -62,7 +67,8 @@ resource "aws_route_table" "public" {
   }
 
   tags = {
-    Name = "${var.project_name}-public-rt"
+    Name        = "${var.project_name}-${var.environment}-public-rt"
+    Environment = var.environment
   }
 }
 
@@ -78,7 +84,8 @@ resource "aws_db_subnet_group" "main" {
   subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
 
   tags = {
-    Name = "${var.project_name}-db-subnet-group"
+    Name        = "${var.project_name}-${var.environment}-db-subnet-group"
+    Environment = var.environment
   }
 }
 
