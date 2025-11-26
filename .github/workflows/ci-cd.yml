@@ -2,9 +2,6 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
-      - develop
 
 env:
   NODE_VERSION: '20'
@@ -47,17 +44,12 @@ jobs:
       - name: Build Docker image
         run: docker build -t ${{ env.DOCKER_IMAGE_NAME }}:latest .
 
-  deploy:
-    name: Deploy Environments
+  deploy-dev:
+    name: Deploy to Dev
     needs: build-and-test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - environment: dev
-            branch: develop
-          - environment: prod
-            branch: main
+    if: github.ref == 'refs/heads/develop'
+    environment: dev
 
     steps:
       - name: Checkout code
@@ -70,12 +62,64 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Check branch
+      - name: Get public IP
+        run: echo "MY_IP=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_ENV
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Init
+        run: terraform -chdir=./terraform/environments/dev init
+
+      - name: Terraform Plan
         run: |
-          if [ "${GITHUB_REF}" != "refs/heads/${{ matrix.branch }}" ]; then
-            echo "Skipping deploy for this branch"
-            exit 0
-          fi
+          terraform -chdir=./terraform/environments/dev plan \
+            -var "project_name=${{ secrets.PROJECT_NAME }}" \
+            -var "environment=dev" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            -var "db_username=${{ secrets.DB_USERNAME }}" \
+            -var "db_password=${{ secrets.DB_PASSWORD }}" \
+            -var "my_ip=$MY_IP" \
+
+      - name: Terraform Apply
+        run: |
+          terraform -chdir=./terraform/environments/dev apply \
+            -var "project_name=${{ secrets.PROJECT_NAME }}" \
+            -var "environment=dev" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            -var "db_username=${{ secrets.DB_USERNAME }}" \
+            -var "db_password=${{ secrets.DB_PASSWORD }}" \
+            -var "my_ip=$MY_IP" \
+            -auto-approve
+
+      - name: Build Docker image
+        run: docker build -t ${{ env.DOCKER_IMAGE_NAME }}:dev .
+
+      - name: Run Docker container
+        run: |
+          docker stop ${{ env.DOCKER_IMAGE_NAME }}-dev || true
+          docker rm ${{ env.DOCKER_IMAGE_NAME }}-dev || true
+          docker run -d --name ${{ env.DOCKER_IMAGE_NAME }}-dev -p 3001:3000 ${{ env.DOCKER_IMAGE_NAME }}:dev
+
+  deploy-prod:
+    name: Deploy to Prod
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: prod
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Get public IP
         run: echo "MY_IP=$(curl -s https://checkip.amazonaws.com)" >> $GITHUB_ENV
@@ -86,13 +130,13 @@ jobs:
           terraform_version: 1.6.0
 
       - name: Terraform Init
-        run: terraform -chdir=./terraform/environments/${{ matrix.environment }} init
+        run: terraform -chdir=./terraform/environments/prod init
 
       - name: Terraform Plan
         run: |
-          terraform -chdir=./terraform/environments/${{ matrix.environment }} plan \
+          terraform -chdir=./terraform/environments/prod plan \
             -var "project_name=${{ secrets.PROJECT_NAME }}" \
-            -var "environment=${{ matrix.environment }}" \
+            -var "environment=prod" \
             -var "aws_region=${{ secrets.AWS_REGION }}" \
             -var "db_username=${{ secrets.DB_USERNAME }}" \
             -var "db_password=${{ secrets.DB_PASSWORD }}" \
@@ -100,19 +144,20 @@ jobs:
 
       - name: Terraform Apply
         run: |
-          terraform -chdir=./terraform apply \
+          terraform -chdir=./terraform/environments/prod apply \
             -var "project_name=${{ secrets.PROJECT_NAME }}" \
-            -var "environment=${{ matrix.environment }}" \
+            -var "environment=prod" \
             -var "aws_region=${{ secrets.AWS_REGION }}" \
             -var "db_username=${{ secrets.DB_USERNAME }}" \
             -var "db_password=${{ secrets.DB_PASSWORD }}" \
             -var "my_ip=$MY_IP" \
+            -auto-approve
 
       - name: Build Docker image
-        run: docker build -t ${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.environment }} .
+        run: docker build -t ${{ env.DOCKER_IMAGE_NAME }}:prod .
 
       - name: Run Docker container
         run: |
-          docker stop ${{ env.DOCKER_IMAGE_NAME }}-${{ matrix.environment }} || true
-          docker rm ${{ env.DOCKER_IMAGE_NAME }}-${{ matrix.environment }} || true
-          docker run -d --name ${{ env.DOCKER_IMAGE_NAME }}-${{ matrix.environment }} -p ${{ matrix.environment == 'dev' && '3001:3000' || '3000:3000' }} ${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.environment }}
+          docker stop ${{ env.DOCKER_IMAGE_NAME }}-prod || true
+          docker rm ${{ env.DOCKER_IMAGE_NAME }}-prod || true
+          docker run -d --name ${{ env.DOCKER_IMAGE_NAME }}-prod -p 3000:3000 ${{ env.DOCKER_IMAGE_NAME }}:prod

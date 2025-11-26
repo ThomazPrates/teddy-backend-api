@@ -1,323 +1,65 @@
-# Teddy Backend API
-
-API REST desenvolvida com NestJS, TypeScript e PostgreSQL. Projeto configurado para desenvolvimento local com Docker e deploy automatizado na AWS.
-
-## 📋 Índice
-
-- [Características](#-características)
-- [Tecnologias](#-tecnologias)
-- [Pré-requisitos](#-pré-requisitos)
-- [Instalação](#-instalação)
-- [Executando a Aplicação](#-executando-a-aplicação)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Scripts Disponíveis](#-scripts-disponíveis)
-- [API Endpoints](#-api-endpoints)
-- [Desenvolvimento](#-desenvolvimento)
-- [Deploy](#-deploy)
-- [Testes](#-testes)
-- [Contribuindo](#-contribuindo)
-
-## ✨ Características
-
-- 🚀 **NestJS** - Framework Node.js progressivo
-- 🗄️ **PostgreSQL** - Banco de dados relacional
-- 🔄 **TypeORM** - ORM para TypeScript
-- ✅ **Validação** - Validação automática de dados com class-validator
-- 🐳 **Docker** - Ambiente de desenvolvimento containerizado
-- ☁️ **AWS** - Infraestrutura como código com Terraform
-- 🔐 **Segurança** - Validação de entrada e sanitização de dados
-
-## 🛠 Tecnologias
-
-### Backend
-- **NestJS** ^10.0.0 - Framework Node.js
-- **TypeScript** ^5.1.3 - Linguagem de programação
-- **TypeORM** ^0.3.27 - ORM
-- **PostgreSQL** - Banco de dados
-- **class-validator** - Validação de DTOs
-- **class-transformer** - Transformação de objetos
-
-### DevOps
-- **Docker** & **Docker Compose** - Containerização
-- **Terraform** - Infraestrutura como código
-- **AWS** - Cloud provider (EC2, RDS, VPC)
-
-### Ferramentas de Desenvolvimento
-- **ESLint** - Linter
-- **Prettier** - Formatador de código
-- **Jest** - Framework de testes
-
-## 📦 Pré-requisitos
-
-### Opção 1: Desenvolvimento com Docker (Recomendado)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) instalado e rodando
-- Docker Compose v3.8 ou superior
-
-### Opção 2: Desenvolvimento Local
-- [Node.js](https://nodejs.org/) versão 18 ou superior
-- [PostgreSQL](https://www.postgresql.org/download/) versão 15 ou superior
-- npm ou yarn
-
-## 🚀 Instalação
-
-### Clone o repositório
-
-```bash
-git clone <repository-url>
-cd teddy-backend-api
-```
-
-### Com Docker (Recomendado)
-
-```bash
-# 1. Copiar arquivo de ambiente
-cp .env.example .env
-
-# 2. Iniciar serviços (aplicação + banco de dados)
-npm run docker:up
-```
-
-A aplicação estará disponível em `http://localhost:3000` e o banco de dados em `localhost:5432`.
-
-Para mais detalhes sobre Docker, consulte [README-DOCKER.md](README-DOCKER.md).
-
-### Sem Docker
-
-```bash
-# 1. Instalar dependências
-npm install
-
-# 2. Configurar banco de dados PostgreSQL
-# Certifique-se de que o PostgreSQL está rodando
-
-# 3. Copiar e configurar variáveis de ambiente
-cp .env.example .env
-# Editar .env com as credenciais do seu PostgreSQL
-
-# 4. Executar migrações (se necessário)
-# O TypeORM criará as tabelas automaticamente em desenvolvimento
-```
-
-## ▶️ Executando a Aplicação
-
-### Com Docker
-
-```bash
-# Iniciar serviços
-npm run docker:up
-
-# Ver logs
-npm run docker:logs
-
-# Parar serviços
-npm run docker:down
-```
-
-### Sem Docker
-
-```bash
-# Modo desenvolvimento (com hot-reload)
-npm run start:dev
-
-# Modo produção
-npm run build
-npm run start:prod
-```
-
-A aplicação estará disponível em `http://localhost:3000`.
-
-## 📁 Estrutura do Projeto
-
-```
-teddy-backend-api/
-├── src/
-│   ├── user/                 # Módulo de usuários
-│   │   ├── dto/             # Data Transfer Objects
-│   │   ├── entities/        # Entidades TypeORM
-│   │   ├── user.controller.ts
-│   │   ├── user.service.ts
-│   │   ├── user.repository.ts
-│   │   └── user.module.ts
-│   ├── app.module.ts        # Módulo principal
-│   └── main.ts              # Arquivo de entrada
-├── terraform/               # Configuração de infraestrutura AWS
-├── docker-compose.yml       # Configuração Docker Compose
-├── Dockerfile              # Imagem de produção
-├── Dockerfile.dev          # Imagem de desenvolvimento
-└── package.json
-```
-
-## 📜 Scripts Disponíveis
-
-### Desenvolvimento
-```bash
-npm run start:dev      # Inicia em modo desenvolvimento com hot-reload
-npm run start:debug    # Inicia em modo debug
-npm run build          # Compila o projeto TypeScript
-npm run start:prod     # Inicia em modo produção
-```
-
-### Qualidade de Código
-```bash
-npm run lint           # Executa ESLint e corrige problemas
-npm run format         # Formata código com Prettier
-```
-
-### Testes
-```bash
-npm run test           # Executa testes unitários
-npm run test:watch     # Executa testes em modo watch
-npm run test:cov       # Executa testes com cobertura
-npm run test:e2e       # Executa testes end-to-end
-```
-
-### Docker
-```bash
-npm run docker:up      # Inicia serviços (app + postgres)
-npm run docker:down    # Para os serviços
-npm run docker:build   # Rebuild das imagens Docker
-npm run docker:logs    # Ver logs dos serviços
-npm run docker:restart # Reinicia os serviços
-npm run docker:clean   # Para e remove volumes (apaga dados do banco)
-```
-
-## 🔌 API Endpoints
-
-### Usuários
-
-#### Criar Usuário
-```http
-POST /users
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "senha123"
-}
-```
-
-**Resposta de Sucesso (201):**
-```json
-{
-  "id": 1,
-  "email": "user@example.com",
-  "createdAt": "2024-01-01T00:00:00.000Z"
-}
-```
-
-**Resposta de Erro (409):**
-```json
-{
-  "statusCode": 409,
-  "message": "Email já cadastrado"
-}
-```
-
-## 💻 Desenvolvimento
-
-### Estrutura de Módulos
-
-O projeto segue a arquitetura modular do NestJS:
-
-- **Controller**: Recebe requisições HTTP e retorna respostas
-- **Service**: Contém a lógica de negócio
-- **Repository**: Gerencia acesso aos dados (padrão Repository)
-- **Entity**: Define a estrutura da tabela no banco de dados
-- **DTO**: Define a estrutura de dados para validação
-
-### Adicionar Novo Módulo
-
-```bash
-# Usando NestJS CLI
-nest generate module nome-do-modulo
-nest generate controller nome-do-modulo
-nest generate service nome-do-modulo
-```
-
-### Variáveis de Ambiente
-
-Crie um arquivo `.env` baseado no `.env.example`:
-
-```env
-# Database
-DATABASE_HOST=localhost
-DATABASE_PORT=5432
-DATABASE_USER=postgres
-DATABASE_PASSWORD=postgres
-DATABASE_NAME=teddydb
-
-# Application
-NODE_ENV=development
-PORT=3000
-```
-
-**Nota**: No Docker Compose, `DATABASE_HOST` deve ser `postgres` (nome do serviço).
-
-## 🚢 Deploy
-
-### Deploy na AWS
-
-O projeto inclui configuração Terraform para deploy na AWS. Veja a documentação de deploy para mais detalhes.
-
-**Recursos provisionados:**
-- VPC com subnets públicas e privadas
-- EC2 Instance para a aplicação
-- RDS PostgreSQL para o banco de dados
-- Security Groups configurados
-- Internet Gateway e Route Tables
-
-### Ambientes
-
-- **Development**: Branch `develop`
-- **Production**: Branch `main`
-
-## 🧪 Testes
-
-```bash
-# Executar todos os testes
-npm test
-
-# Executar testes em modo watch
-npm run test:watch
-
-# Executar testes com cobertura
-npm run test:cov
-```
-
-## 🤝 Contribuindo
-
-1. Faça um fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
-### Padrões de Código
-
-- Use ESLint e Prettier para manter consistência
-- Siga os padrões do NestJS
-- Escreva testes para novas funcionalidades
-- Documente mudanças significativas
-
-## 📝 Licença
-
-Este projeto está sob a licença MIT.
-
-## 📚 Documentação Adicional
-
-- [Guia Docker](README-DOCKER.md) - Documentação completa sobre Docker
-- [NestJS Documentation](https://docs.nestjs.com/) - Documentação oficial do NestJS
-- [TypeORM Documentation](https://typeorm.io/) - Documentação do TypeORM
-
-## 👥 Autores
-
-- **Seu Nome** - *Desenvolvimento inicial*
-
-## 🙏 Agradecimentos
-
-- NestJS por fornecer um framework excelente
-- Comunidade open source
-
----
-
-**Desenvolvido com ❤️ usando NestJS**
+# README - Deploy da Aplicação NestJS com Docker, Terraform, EC2 e RDS PostgreSQL
+
+## Visão Geral  
+Esta aplicação NestJS está configurada para ser executada via Docker Compose e implantada em infraestrutura AWS usando Terraform. A hospedagem ocorre em instância EC2 e o banco de dados é um RDS PostgreSQL.
+
+## Pré-requisitos  
+- Docker e Docker Compose instalados na máquina local  
+- AWS CLI configurada  
+- Terraform instalado  
+- Conta AWS com permissões para criar EC2, RDS e demais recursos  
+
+## Comandos principais - package.json
+
+| Comando                       | Descrição                                                      |
+|------------------------------|----------------------------------------------------------------|
+| `npm run build`               | Compila o projeto NestJS                                       |
+| `npm run format`              | Formata o código com Prettier                                  |
+| `npm run start`               | Inicia a aplicação NestJS localmente                           |
+| `npm run start:debug`         | Inicia em modo debug e watch                                   |
+| `npm run lint`                | Executa ESLint para correção automática                        |
+| `npm run test`                | Executa os testes com Jest                                     |
+| `npm run test:watch`          | Executa testes em modo watch                                   |
+| `npm run test:cov`            | Roda testes com cobertura                                      |
+| `npm run test:debug`          | Debug dos testes                                               |
+| `npm run docker:up`           | Sobe os containers via docker-compose                          |
+| `npm run docker:down`         | Derruba os containers (terraform/docker-compose.yml)           |
+| `npm run terraform:init:dev` | Inicializa Terraform para ambiente dev                         |
+| `npm run terraform:init:prod`| Inicializa Terraform para ambiente prod                        |
+| `npm run terraform:plan:dev` | Exibe plano Terraform para dev                                 |
+| `npm run terraform:plan:prod`| Exibe plano Terraform para prod                                |
+| `npm run terraform:apply:dev`| Aplica infraestrutura Terraform para dev                      |
+| `npm run terraform:apply:prod`| Aplica infraestrutura Terraform para prod                    |
+| `npm run terraform:destroy:dev`| Destrói infraestrutura dev                                   |
+| `npm run terraform:destroy:prod`| Destrói infraestrutura prod                                 |
+| `npm run terraform:output:dev`| Exibe outputs Terraform dev                                   |
+| `npm run terraform:output:prod`| Exibe outputs Terraform prod                                 |
+| `npm run deploy`              | Build + aplica Terraform dev                                   |
+| `npm run deploy:prod`         | Build + aplica Terraform prod                                  |
+
+## Passo a passo para deploy  
+
+1. Clone o repositório  
+2. Configure os arquivos `terraform.tfvars` com as credenciais e parâmetros AWS  
+3. Inicialize Terraform para o ambiente desejado: `npm run terraform:init:dev`
+4. Planeje a infraestrutura: `npm run terraform:plan:dev`
+5. Aplique alterações para criar recursos AWS (EC2, RDS): `npm run terraform:apply:dev`
+6. Para testes locais, suba os containers Docker: `npm run docker:up`
+7. Para produção, use os comandos equivalentes com `prod`.  
+
+## Escalabilidade em Produção
+
+### Escala Vertical  
+- Consiste em aumentar recursos da instância EC2 (CPU, RAM) e do RDS (CPU, memória e armazenamento).  
+- O Amazon RDS permite aumento automático ou manual do armazenamento, mas reduzí-lo manualmente não é suportado.  
+- Pode causar downtime temporário durante upgrades, que deve ser planejado.  
+
+### Escala Horizontal  
+- Para EC2, usar Auto Scaling Groups que criam/removem instâncias automaticamente conforme demanda.  
+- Para RDS PostgreSQL, é possível criar réplicas de leitura que distribuem a carga de leitura e aumentam capacidade horizontalmente.  
+
+### Desafios e Soluções  
+- **Sincronização e consistência de dados**: As réplicas são somente leitura; escritas devem ir para a instância principal. Isso exige arquitetura que lide com replicação e failover.  
+- **Gerenciamento de estado da aplicação**: Em múltiplas instâncias EC2, use balanceadores de carga (ELB) para distribuir requisições.  
+- **Limitações de redução de recursos**: Reduzir a escala vertical do RDS não é suportado automaticamente; planejamento é essencial para evitar recursos ociosos.  
+- **Escalabilidade automática**: Configurar Auto Scaling para EC2 e monitorar uso do RDS para ajustes manuais ou semi-automáticos.  
