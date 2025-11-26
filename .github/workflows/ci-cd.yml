@@ -136,18 +136,76 @@ jobs:
 
       - name: Setup SSH
         run: |
-          # A chave privada já foi gerada no step "Generate SSH Key Pair"
-          ssh-keyscan -H ${{ steps.terraform_output.outputs.ec2_ip }} >> ~/.ssh/known_hosts
-          # Aguardar EC2 estar pronta para SSH (pode levar alguns segundos após criação)
-          echo "Aguardando EC2 estar pronta para SSH..."
-          for i in {1..30}; do
-            if ssh -i ~/.ssh/aws_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@${{ steps.terraform_output.outputs.ec2_ip }} "echo 'EC2 pronta!'" 2>/dev/null; then
-              echo "EC2 está pronta!"
+          EC2_IP="${{ steps.terraform_output.outputs.ec2_ip }}"
+          ENVIRONMENT="${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}"
+          echo "EC2 IP: ${EC2_IP}"
+          echo "Environment: ${ENVIRONMENT}"
+          
+          # Obter Instance ID via AWS CLI
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=ip-address,Values=${EC2_IP}" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "⚠️ Não foi possível obter Instance ID por IP, tentando buscar por tag..."
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=${{ secrets.PROJECT_NAME }}-${ENVIRONMENT}-app-server" "Name=instance-state-name,Values=running,pending" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text 2>/dev/null || echo "")
+          fi
+          
+          echo "Instance ID: ${INSTANCE_ID}"
+          
+          # Aguardar instância estar em estado "running" e status checks passarem
+          if [ -n "$INSTANCE_ID" ]; then
+            echo "Aguardando instância estar pronta (status checks)..."
+            aws ec2 wait instance-status-ok --instance-ids ${INSTANCE_ID} --max-attempts 60 --delay 10 || echo "⚠️ Timeout aguardando status checks, continuando..."
+          fi
+          
+          # Adicionar host key
+          ssh-keyscan -H ${EC2_IP} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          # Aguardar SSH estar disponível (com timeout máximo de 5 minutos)
+          echo "Aguardando SSH estar disponível..."
+          MAX_ATTEMPTS=30
+          ATTEMPT=0
+          SSH_READY=false
+          
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Tentativa $ATTEMPT/$MAX_ATTEMPTS..."
+            
+            # Tentar conectar com timeout curto
+            if ssh -i ~/.ssh/aws_key \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              ec2-user@${EC2_IP} "echo 'SSH OK'" 2>&1; then
+              echo "✅ SSH está disponível!"
+              SSH_READY=true
               break
+            else
+              SSH_ERROR=$?
+              echo "SSH ainda não disponível (código: $SSH_ERROR). Aguardando 10 segundos..."
+              sleep 10
             fi
-            echo "Tentativa $i/30 - aguardando..."
-            sleep 10
           done
+          
+          if [ "$SSH_READY" = false ]; then
+            echo "❌ ERRO: Não foi possível conectar via SSH após $MAX_ATTEMPTS tentativas"
+            echo "Verificando status da instância..."
+            if [ -n "$INSTANCE_ID" ]; then
+              aws ec2 describe-instance-status --instance-ids ${INSTANCE_ID} || true
+            fi
+            echo "Verificando Security Group..."
+            aws ec2 describe-security-groups --filters "Name=ip-permission.from-port,Values=22" --query 'SecurityGroups[*].[GroupName,GroupId]' --output table || true
+            echo "Verificando se o IP do GitHub Actions está no Security Group..."
+            GITHUB_IP=$(curl -s https://checkip.amazonaws.com)
+            echo "IP atual do GitHub Actions: ${GITHUB_IP}"
+            exit 1
+          fi
 
       - name: Deploy to EC2
         env:
@@ -182,19 +240,47 @@ jobs:
           ssh -i ~/.ssh/aws_key -o StrictHostKeyChecking=no ec2-user@${EC2_IP} << 'DEPLOY_SCRIPT'
             set -e
             cd /home/ec2-user/app
+            
+            # Extrair e limpar
             tar -xzf deploy.tar.gz
             rm deploy.tar.gz
+            
             # Garantir que Docker está rodando
             sudo systemctl start docker || true
+            sudo systemctl enable docker || true
+            sleep 5
+            
+            # Parar containers existentes
             docker-compose -f docker-compose.prod.yml down || true
+            
+            # Build e start
             docker-compose -f docker-compose.prod.yml up -d --build
+            
+            # Limpar imagens antigas
             docker image prune -f
-            # Verificar se container está rodando
-            sleep 10
-            docker ps
+            
+            # Aguardar container iniciar
+            echo "Aguardando container iniciar..."
+            sleep 15
+            
+            # Verificar status
+            echo "=== Status dos containers ==="
+            docker ps -a
+            
             # Verificar logs
-            echo "=== Logs do container ==="
+            echo ""
+            echo "=== Logs do container (últimas 50 linhas) ==="
             docker logs --tail 50 teddy-backend-app || true
+            
+            # Verificar se porta está escutando
+            echo ""
+            echo "=== Verificando porta 3000 ==="
+            sudo netstat -tlnp | grep 3000 || sudo ss -tlnp | grep 3000 || echo "Porta 3000 não está em uso"
+            
+            # Teste local
+            echo ""
+            echo "=== Teste local ==="
+            curl -v http://localhost:3000/api-docs 2>&1 | head -10 || echo "Falha no teste local"
           DEPLOY_SCRIPT
           
           echo "✅ Deploy concluído! API disponível em: http://${EC2_IP}:3000"
@@ -291,18 +377,76 @@ jobs:
 
       - name: Setup SSH
         run: |
-          # A chave privada já foi gerada no step "Generate SSH Key Pair"
-          ssh-keyscan -H ${{ steps.terraform_output.outputs.ec2_ip }} >> ~/.ssh/known_hosts
-          # Aguardar EC2 estar pronta para SSH (pode levar alguns segundos após criação)
-          echo "Aguardando EC2 estar pronta para SSH..."
-          for i in {1..30}; do
-            if ssh -i ~/.ssh/aws_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@${{ steps.terraform_output.outputs.ec2_ip }} "echo 'EC2 pronta!'" 2>/dev/null; then
-              echo "EC2 está pronta!"
+          EC2_IP="${{ steps.terraform_output.outputs.ec2_ip }}"
+          ENVIRONMENT="${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}"
+          echo "EC2 IP: ${EC2_IP}"
+          echo "Environment: ${ENVIRONMENT}"
+          
+          # Obter Instance ID via AWS CLI
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=ip-address,Values=${EC2_IP}" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "⚠️ Não foi possível obter Instance ID por IP, tentando buscar por tag..."
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=${{ secrets.PROJECT_NAME }}-${ENVIRONMENT}-app-server" "Name=instance-state-name,Values=running,pending" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text 2>/dev/null || echo "")
+          fi
+          
+          echo "Instance ID: ${INSTANCE_ID}"
+          
+          # Aguardar instância estar em estado "running" e status checks passarem
+          if [ -n "$INSTANCE_ID" ]; then
+            echo "Aguardando instância estar pronta (status checks)..."
+            aws ec2 wait instance-status-ok --instance-ids ${INSTANCE_ID} --max-attempts 60 --delay 10 || echo "⚠️ Timeout aguardando status checks, continuando..."
+          fi
+          
+          # Adicionar host key
+          ssh-keyscan -H ${EC2_IP} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          # Aguardar SSH estar disponível (com timeout máximo de 5 minutos)
+          echo "Aguardando SSH estar disponível..."
+          MAX_ATTEMPTS=30
+          ATTEMPT=0
+          SSH_READY=false
+          
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Tentativa $ATTEMPT/$MAX_ATTEMPTS..."
+            
+            # Tentar conectar com timeout curto
+            if ssh -i ~/.ssh/aws_key \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              ec2-user@${EC2_IP} "echo 'SSH OK'" 2>&1; then
+              echo "✅ SSH está disponível!"
+              SSH_READY=true
               break
+            else
+              SSH_ERROR=$?
+              echo "SSH ainda não disponível (código: $SSH_ERROR). Aguardando 10 segundos..."
+              sleep 10
             fi
-            echo "Tentativa $i/30 - aguardando..."
-            sleep 10
           done
+          
+          if [ "$SSH_READY" = false ]; then
+            echo "❌ ERRO: Não foi possível conectar via SSH após $MAX_ATTEMPTS tentativas"
+            echo "Verificando status da instância..."
+            if [ -n "$INSTANCE_ID" ]; then
+              aws ec2 describe-instance-status --instance-ids ${INSTANCE_ID} || true
+            fi
+            echo "Verificando Security Group..."
+            aws ec2 describe-security-groups --filters "Name=ip-permission.from-port,Values=22" --query 'SecurityGroups[*].[GroupName,GroupId]' --output table || true
+            echo "Verificando se o IP do GitHub Actions está no Security Group..."
+            GITHUB_IP=$(curl -s https://checkip.amazonaws.com)
+            echo "IP atual do GitHub Actions: ${GITHUB_IP}"
+            exit 1
+          fi
 
       - name: Deploy to EC2
         env:
