@@ -14,8 +14,8 @@ data "aws_ami" "amazon_linux_2" {
 }
 
 locals {
-  ssh_public_key_source = var.ssh_public_key != "" ? var.ssh_public_key : file(pathexpand(var.local_ssh_pub_file))
-  ssh_public_key_content = trimspace(replace(local.ssh_public_key_source, "/[\r\n]+/", ""))
+  ssh_public_key_raw = var.ssh_public_key != "" ? var.ssh_public_key : file(pathexpand(var.local_ssh_pub_file))
+  ssh_public_key_content = trimspace(replace(local.ssh_public_key_raw, "/[\r\n]+/", ""))
 }
 
 resource "aws_key_pair" "main" {
