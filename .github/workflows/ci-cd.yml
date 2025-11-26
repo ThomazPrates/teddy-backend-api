@@ -138,8 +138,11 @@ jobs:
         run: |
           EC2_IP="${{ steps.terraform_output.outputs.ec2_ip }}"
           ENVIRONMENT="${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}"
+          GITHUB_IP=$(curl -s https://checkip.amazonaws.com)
+          
           echo "EC2 IP: ${EC2_IP}"
           echo "Environment: ${ENVIRONMENT}"
+          echo "GitHub Actions IP: ${GITHUB_IP}"
           
           # Obter Instance ID via AWS CLI
           INSTANCE_ID=$(aws ec2 describe-instances \
@@ -157,8 +160,39 @@ jobs:
           
           echo "Instance ID: ${INSTANCE_ID}"
           
-          # Aguardar instância estar em estado "running" e status checks passarem
+          # Verificar e atualizar Security Group se necessário
           if [ -n "$INSTANCE_ID" ]; then
+            SG_ID=$(aws ec2 describe-instances \
+              --instance-ids ${INSTANCE_ID} \
+              --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$SG_ID" ]; then
+              echo "Security Group ID: ${SG_ID}"
+              echo "Verificando se IP ${GITHUB_IP} está permitido no Security Group..."
+              
+              # Verificar se regra SSH para este IP já existe
+              HAS_RULE=$(aws ec2 describe-security-groups \
+                --group-ids ${SG_ID} \
+                --query "SecurityGroups[0].IpPermissions[?FromPort==\`22\` && IpRanges[?CidrIp==\`${GITHUB_IP}/32\`]]" \
+                --output text 2>/dev/null || echo "")
+              
+              if [ -z "$HAS_RULE" ]; then
+                echo "⚠️ IP ${GITHUB_IP} não está no Security Group. Adicionando..."
+                aws ec2 authorize-security-group-ingress \
+                  --group-id ${SG_ID} \
+                  --protocol tcp \
+                  --port 22 \
+                  --cidr ${GITHUB_IP}/32 \
+                  || echo "⚠️ Erro ao adicionar regra (pode já existir)"
+                echo "Aguardando 5 segundos para regra ser aplicada..."
+                sleep 5
+              else
+                echo "✅ IP ${GITHUB_IP} já está permitido no Security Group"
+              fi
+            fi
+            
+            # Aguardar instância estar em estado "running" e status checks passarem
             echo "Aguardando instância estar pronta (status checks)..."
             aws ec2 wait instance-status-ok --instance-ids ${INSTANCE_ID} --max-attempts 60 --delay 10 || echo "⚠️ Timeout aguardando status checks, continuando..."
           fi
@@ -200,10 +234,9 @@ jobs:
               aws ec2 describe-instance-status --instance-ids ${INSTANCE_ID} || true
             fi
             echo "Verificando Security Group..."
-            aws ec2 describe-security-groups --filters "Name=ip-permission.from-port,Values=22" --query 'SecurityGroups[*].[GroupName,GroupId]' --output table || true
-            echo "Verificando se o IP do GitHub Actions está no Security Group..."
-            GITHUB_IP=$(curl -s https://checkip.amazonaws.com)
-            echo "IP atual do GitHub Actions: ${GITHUB_IP}"
+            if [ -n "$SG_ID" ]; then
+              aws ec2 describe-security-groups --group-ids ${SG_ID} --query 'SecurityGroups[0].IpPermissions[?FromPort==`22`]' || true
+            fi
             exit 1
           fi
 
@@ -379,8 +412,11 @@ jobs:
         run: |
           EC2_IP="${{ steps.terraform_output.outputs.ec2_ip }}"
           ENVIRONMENT="${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}"
+          GITHUB_IP=$(curl -s https://checkip.amazonaws.com)
+          
           echo "EC2 IP: ${EC2_IP}"
           echo "Environment: ${ENVIRONMENT}"
+          echo "GitHub Actions IP: ${GITHUB_IP}"
           
           # Obter Instance ID via AWS CLI
           INSTANCE_ID=$(aws ec2 describe-instances \
@@ -398,8 +434,39 @@ jobs:
           
           echo "Instance ID: ${INSTANCE_ID}"
           
-          # Aguardar instância estar em estado "running" e status checks passarem
+          # Verificar e atualizar Security Group se necessário
           if [ -n "$INSTANCE_ID" ]; then
+            SG_ID=$(aws ec2 describe-instances \
+              --instance-ids ${INSTANCE_ID} \
+              --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$SG_ID" ]; then
+              echo "Security Group ID: ${SG_ID}"
+              echo "Verificando se IP ${GITHUB_IP} está permitido no Security Group..."
+              
+              # Verificar se regra SSH para este IP já existe
+              HAS_RULE=$(aws ec2 describe-security-groups \
+                --group-ids ${SG_ID} \
+                --query "SecurityGroups[0].IpPermissions[?FromPort==\`22\` && IpRanges[?CidrIp==\`${GITHUB_IP}/32\`]]" \
+                --output text 2>/dev/null || echo "")
+              
+              if [ -z "$HAS_RULE" ]; then
+                echo "⚠️ IP ${GITHUB_IP} não está no Security Group. Adicionando..."
+                aws ec2 authorize-security-group-ingress \
+                  --group-id ${SG_ID} \
+                  --protocol tcp \
+                  --port 22 \
+                  --cidr ${GITHUB_IP}/32 \
+                  || echo "⚠️ Erro ao adicionar regra (pode já existir)"
+                echo "Aguardando 5 segundos para regra ser aplicada..."
+                sleep 5
+              else
+                echo "✅ IP ${GITHUB_IP} já está permitido no Security Group"
+              fi
+            fi
+            
+            # Aguardar instância estar em estado "running" e status checks passarem
             echo "Aguardando instância estar pronta (status checks)..."
             aws ec2 wait instance-status-ok --instance-ids ${INSTANCE_ID} --max-attempts 60 --delay 10 || echo "⚠️ Timeout aguardando status checks, continuando..."
           fi
@@ -441,10 +508,9 @@ jobs:
               aws ec2 describe-instance-status --instance-ids ${INSTANCE_ID} || true
             fi
             echo "Verificando Security Group..."
-            aws ec2 describe-security-groups --filters "Name=ip-permission.from-port,Values=22" --query 'SecurityGroups[*].[GroupName,GroupId]' --output table || true
-            echo "Verificando se o IP do GitHub Actions está no Security Group..."
-            GITHUB_IP=$(curl -s https://checkip.amazonaws.com)
-            echo "IP atual do GitHub Actions: ${GITHUB_IP}"
+            if [ -n "$SG_ID" ]; then
+              aws ec2 describe-security-groups --group-ids ${SG_ID} --query 'SecurityGroups[0].IpPermissions[?FromPort==`22`]' || true
+            fi
             exit 1
           fi
 
