@@ -1,7 +1,7 @@
 {
   "name": "teddy-backend-api",
   "version": "0.0.1",
-  "description": "",
+  "description": "Project to shorter urls to users",
   "author": "",
   "private": true,
   "license": "MIT",
@@ -15,7 +15,6 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
     "docker:up": "docker-compose up",
     "docker:down": "docker compose -f infrastructure/docker/docker-compose.yml down",
     "terraform:init:dev": "cd terraform && terraform init",
