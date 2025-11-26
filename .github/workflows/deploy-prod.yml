@@ -1,0 +1,91 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ENVIRONMENT: prod
+  TF_VAR_FILE: terraform.tfvars.prod
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build application
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.6.0'
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: ./terraform
+        run: |
+          terraform plan \
+            -var-file=${{ env.TF_VAR_FILE }} \
+            -var="db_password=${{ secrets.DB_PASSWORD_PROD }}" \
+            -var="my_ip=${{ secrets.MY_IP }}" \
+            -var="ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" \
+            -out=tfplan
+        continue-on-error: true
+
+      - name: Terraform Apply
+        working-directory: ./terraform
+        run: terraform apply -auto-approve tfplan || terraform apply -var-file=${{ env.TF_VAR_FILE }} -var="db_password=${{ secrets.DB_PASSWORD_PROD }}" -var="my_ip=${{ secrets.MY_IP }}" -var="ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" -auto-approve
+
+      - name: Get Terraform Outputs
+        id: terraform-output
+        working-directory: ./terraform
+        run: |
+          echo "ec2_public_ip=$(terraform output -raw ec2_public_ip)" >> $GITHUB_OUTPUT
+          echo "ec2_public_dns=$(terraform output -raw ec2_public_dns)" >> $GITHUB_OUTPUT
+          echo "rds_endpoint=$(terraform output -raw rds_endpoint)" >> $GITHUB_OUTPUT
+          echo "rds_address=$(terraform output -raw rds_address)" >> $GITHUB_OUTPUT
+
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment to Production Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Infrastructure Details" >> $GITHUB_STEP_SUMMARY
+          echo "- **EC2 Public IP**: ${{ steps.terraform-output.outputs.ec2_public_ip }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **EC2 Public DNS**: ${{ steps.terraform-output.outputs.ec2_public_dns }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **RDS Endpoint**: ${{ steps.terraform-output.outputs.rds_endpoint }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **RDS Address**: ${{ steps.terraform-output.outputs.rds_address }}" >> $GITHUB_STEP_SUMMARY
+

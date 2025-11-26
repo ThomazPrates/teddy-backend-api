@@ -45,7 +45,8 @@ resource "aws_security_group" "ec2" {
   }
 
   tags = {
-    Name = "${var.project_name}-ec2-sg"
+    Name        = "${var.project_name}-${var.environment}-ec2-sg"
+    Environment = var.environment
   }
 }
 
@@ -71,7 +72,8 @@ resource "aws_security_group" "rds" {
   }
 
   tags = {
-    Name = "${var.project_name}-rds-sg"
+    Name        = "${var.project_name}-${var.environment}-rds-sg"
+    Environment = var.environment
   }
 }
 
