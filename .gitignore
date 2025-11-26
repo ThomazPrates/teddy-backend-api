@@ -4,7 +4,7 @@
 **/terraform.tfstate
 **/terraform.tfstate.backup
 **/terraform.tfvars
-**/*.tfvars.json
+**/*.tfvars
 **/crash.log
 **/crash.*.log
 **/.terraformrc
