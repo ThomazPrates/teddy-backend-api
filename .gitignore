@@ -30,3 +30,16 @@ logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Deploy
+deploy*.tar.gz
+deploy*.tar
+
+# Postman test results
+postman/test-results.html
+
+# SSH Keys
+*.pem
+*_key
+*_key.pub
+!terraform/**/*.pub.example

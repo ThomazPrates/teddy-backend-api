@@ -1,4 +1,4 @@
-# 🐻 Teddy Backend API
+# Teddy Backend API
 
 API REST para encurtamento de URLs desenvolvida com NestJS, permitindo que usuários criem links curtos e personalizados, gerenciem suas URLs e façam redirecionamentos.
 
@@ -294,6 +294,8 @@ graph TB
 - ✅ Infraestrutura como código (Terraform)
 - ✅ Ambientes separados (dev/prod)
 - ✅ Containerização com Docker
+- ✅ BASE_URL configurável por ambiente
+- ✅ URLs encurtadas completas nas respostas da API
 
 ## 🛠 Tecnologias
 
@@ -359,7 +361,13 @@ JWT_EXPIRES_IN=1d
 # Application
 NODE_ENV=development
 PORT=3000
+BASE_URL=http://localhost:3000  # URL base da API (usada para gerar URLs encurtadas completas)
 ```
+
+> **Nota sobre BASE_URL**: Esta variável define a URL base da API e é usada para gerar as URLs encurtadas completas nas respostas. 
+> - **Desenvolvimento**: `http://localhost:3000`
+> - **Produção**: `http://<EC2_IP>:3000` ou `https://api.seudominio.com`
+> - **Alternativa**: Você pode usar `API_URL` em vez de `BASE_URL` (BASE_URL tem prioridade)
 
 ### Terraform
 
@@ -439,7 +447,7 @@ A documentação interativa da API está disponível via Swagger:
 - `DELETE /shorten/my-urls/:id` - Deletar URL (requer autenticação)
 
 #### Redirecionamento
-- `GET /redirect/:code` - Redireciona para a URL original
+- `GET /:code` - Redireciona para a URL original (exemplo: `GET /abc123`)
 
 ## 📝 Comandos Disponíveis
 
@@ -540,13 +548,16 @@ O projeto utiliza GitHub Actions para automação de CI/CD.
 
 1. **Configure as credenciais AWS**:
    - Configure o AWS CLI
-   - Configure os secrets no GitHub (para CI/CD):
-     - `AWS_ACCESS_KEY_ID`
-     - `AWS_SECRET_ACCESS_KEY`
-     - `AWS_REGION`
-     - `PROJECT_NAME`
-     - `DB_USERNAME`
-     - `DB_PASSWORD`
+   - Configure os secrets no GitHub (Settings → Secrets and variables → Actions):
+     - `AWS_ACCESS_KEY_ID` - Credencial de acesso AWS
+     - `AWS_SECRET_ACCESS_KEY` - Chave secreta AWS
+     - `AWS_REGION` - Região AWS (ex: `us-east-1`)
+     - `PROJECT_NAME` - Nome do projeto
+     - `DB_USERNAME` - Usuário do banco de dados
+     - `DB_PASSWORD` - Senha do banco de dados
+     - `DATABASE_NAME` - Nome do banco (opcional, padrão: `teddydb`)
+     - `JWT_SECRET` - Secret para assinatura JWT
+     - `EC2_SSH_PRIVATE_KEY` - Chave privada SSH para acesso ao EC2
 
 2. **Configure os arquivos Terraform**:
    - Edite `terraform/environments/dev/terraform.tfvars`
@@ -568,14 +579,34 @@ npm run terraform:apply:prod
 4. **Deploy Automático via CI/CD**:
    - Faça push para `develop` → deploy automático em dev
    - Faça push para `main` → deploy automático em prod
+   - A `BASE_URL` é configurada automaticamente usando o IP do EC2: `http://<EC2_IP>:3000`
 
 ### Infraestrutura
 
 A infraestrutura na AWS inclui:
-- **EC2**: Instância para hospedar a aplicação
-- **RDS PostgreSQL**: Banco de dados gerenciado
-- **Security Groups**: Configuração de segurança
-- **VPC**: Rede virtual isolada
+- **EC2**: Instância para hospedar a aplicação (com IP público)
+- **RDS PostgreSQL**: Banco de dados gerenciado em subnet privada
+- **Security Groups**: Configuração de segurança (porta 3000 aberta publicamente)
+- **VPC**: Rede virtual isolada com subnets públicas e privadas
+
+### Acessando a API após Deploy
+
+Após o deploy, você pode acessar a API usando:
+
+```bash
+# Obter o IP do EC2
+terraform -chdir=./terraform/environments/prod output ec2_public_ip
+
+# Acessar a API
+curl http://<EC2_IP>:3000/api-docs
+
+# Exemplo: Criar URL encurtada
+curl -X POST http://<EC2_IP>:3000/shorten \
+  -H "Content-Type: application/json" \
+  -d '{"originalUrl": "https://www.example.com"}'
+```
+
+> **Importante**: A `BASE_URL` é configurada automaticamente no deploy para usar o IP do EC2. Se você tiver um domínio, configure `BASE_URL=https://api.seudominio.com` no secret do GitHub ou no arquivo `.env` do EC2.
 
 ## 📁 Estrutura do Projeto
 

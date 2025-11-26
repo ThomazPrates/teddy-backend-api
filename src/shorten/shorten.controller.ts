@@ -29,7 +29,8 @@ export class ShortenController {
   @ApiBody({ type: CreateShortUrlDto })
   @ApiResponse({ status: 201, description: 'URL criada com sucesso', type: ShortUrlResponseDto })
   async create(@Body() dto: CreateShortUrlDto, @Request() req: any) {
-    return this.shortenService.createShortUrl(dto, req.user?.userId);
+    const url = await this.shortenService.createShortUrl(dto, req.user?.userId);
+    return this.shortenService.toShortUrlResponse(url);
   }
 
   @UseGuards(AuthGuard)

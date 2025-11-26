@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, Inject, forwardRef } from '@nestjs/common';
 import { CreateUserRequestDto } from './dto/create-user-request.dto';
 import { UserRepository } from './user.repository';
 import { User } from './entities/user.entity';
@@ -10,6 +10,7 @@ import * as bcrypt from 'bcrypt';
 export class UserService {
   constructor(
     private readonly userRepository: UserRepository,
+    @Inject(forwardRef(() => AuthService))
     private readonly authService: AuthService,
   ) {}
 

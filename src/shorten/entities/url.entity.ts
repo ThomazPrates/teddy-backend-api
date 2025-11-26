@@ -16,7 +16,7 @@ export class Url {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true, length: 6 })
+  @Column({ unique: true, length: 30 })
   @Index()
   shortCode: string;
 

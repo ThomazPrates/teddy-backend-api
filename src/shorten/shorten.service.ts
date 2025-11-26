@@ -1,11 +1,10 @@
-// src/shorten/shorten.service.ts
-
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import { CreateShortUrlDto } from './dto/create-short-url.dto';
 import { UpdateUrlDto } from './dto/update-url.dto';
@@ -21,7 +20,21 @@ import { User } from '../user/entities/user.entity';
 
 @Injectable()
 export class ShortenService {
-  constructor(private readonly repository: ShortenRepository) {}
+  constructor(
+    private readonly repository: ShortenRepository,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private getBaseUrl(): string {
+    return this.configService.get<string>('app.baseUrl', 'http://localhost:3000');
+  }
+
+  private buildShortUrl(shortCode: string): string {
+    const baseUrl = this.getBaseUrl().replace(/\/$/, '');
+    return `${baseUrl}/${shortCode}`;
+  }
+
+  private readonly RESERVED_ROUTES = ['auth', 'users', 'shorten', 'redirect', 'api-docs', 'docs', 'api'];
 
   async createShortUrl(dto: CreateShortUrlDto, ownerId?: number): Promise<Url> {
     if (dto.alias && !ownerId) {
@@ -30,34 +43,58 @@ export class ShortenService {
       );
     }
 
-    const shortCode = dto.alias
-      ? dto.alias
-      : await this.generateUniqueShortCode();
+    let shortCode: string;
 
-    const shortCodeToUse = shortCode.trim();
+    if (dto.alias) {
+      const normalizedAlias = dto.alias.toLowerCase().trim();
 
-    if (shortCodeToUse.length !== SHORT_CODE_LENGTH) {
-      throw new BadRequestException(
-        `O código precisa ter ${SHORT_CODE_LENGTH} caracteres.`,
-      );
+      if (this.RESERVED_ROUTES.includes(normalizedAlias)) {
+        throw new BadRequestException(
+          `O alias "${normalizedAlias}" é uma rota reservada e não pode ser usado`,
+        );
+      }
+
+      const existing = await this.repository.findByShortCodeCaseInsensitive(normalizedAlias);
+      if (existing) {
+        throw new BadRequestException('Alias já está em uso');
+      }
+
+      shortCode = normalizedAlias;
+    } else {
+      shortCode = await this.generateUniqueShortCode();
     }
 
-    const exists = await this.repository.findWithDeleted(shortCodeToUse);
+    const exists = await this.repository.findWithDeleted(shortCode);
     if (exists) {
-      throw new BadRequestException('Alias já está em uso');
+      throw new BadRequestException('Código já está em uso');
     }
 
     const entity = this.repository.create({
-      shortCode: shortCodeToUse,
-      originalUrl: dto.originalUrl,
+      shortCode,
+      originalUrl: dto.originalUrl.trim(),
       owner: ownerId ? ({ id: ownerId } as User) : undefined,
     });
 
     return this.repository.save(entity);
   }
 
-  async listByOwner(ownerId: number): Promise<Url[]> {
-    return this.repository.listByOwner(ownerId);
+  toShortUrlResponse(url: Url): any {
+    return {
+      id: url.id,
+      originalUrl: url.originalUrl,
+      shortUrl: this.buildShortUrl(url.shortCode),
+      shortCode: url.shortCode,
+      alias: url.shortCode,
+      accessCount: url.accessCount,
+      ownerId: url.owner?.id,
+      createdAt: url.createdAt,
+      updatedAt: url.updatedAt,
+    };
+  }
+
+  async listByOwner(ownerId: number): Promise<any[]> {
+    const urls = await this.repository.listByOwner(ownerId);
+    return urls.map((url) => this.toShortUrlResponse(url));
   }
 
   async updateUrl(id: number, ownerId: number, dto: UpdateUrlDto) {
@@ -70,7 +107,8 @@ export class ShortenService {
 
     url.originalUrl = dto.originalUrl;
 
-    return this.repository.save(url);
+    const savedUrl = await this.repository.save(url);
+    return this.toShortUrlResponse(savedUrl);
   }
 
   async softDelete(id: number, ownerId: number): Promise<void> {
