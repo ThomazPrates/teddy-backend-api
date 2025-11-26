@@ -11,7 +11,6 @@ import { UpdateUrlDto } from './dto/update-url.dto';
 
 import {
   generateShortCode,
-  SHORT_CODE_LENGTH,
 } from '../shared/helpers/short-code.helper';
 
 import { ShortenRepository } from './shorten.repository';
