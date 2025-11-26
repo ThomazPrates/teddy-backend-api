@@ -1,5 +1,4 @@
-import { IsOptional, IsString, IsUrl, Length, Matches } from 'class-validator';
-import { SHORT_CODE_LENGTH } from '../../shared/helpers/short-code.helper';
+import { IsOptional, IsString, IsUrl, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateShortUrlDto {
