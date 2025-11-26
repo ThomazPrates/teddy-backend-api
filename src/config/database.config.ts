@@ -16,4 +16,3 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => {
     ssl: isProduction ? { rejectUnauthorized: false } : false,
   };
 };
-
