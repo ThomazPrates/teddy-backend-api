@@ -239,7 +239,7 @@ sequenceDiagram
     API-->>Client: Lista de URLs
     
     Note over Client,DB: Redirecionamento
-    Client->>API: GET /:code
+    Client->>API: GET redirect/:code
     API->>Service: RedirectService.getOriginalUrl()
     Service->>DB: Buscar URL por código
     DB-->>Service: URL original
@@ -439,7 +439,7 @@ A documentação interativa da API está disponível via Swagger:
 - `DELETE /shorten/my-urls/:id` - Deletar URL (requer autenticação)
 
 #### Redirecionamento
-- `GET /:code` - Redireciona para a URL original
+- `GET /redirect/:code` - Redireciona para a URL original
 
 ## 📝 Comandos Disponíveis
 
