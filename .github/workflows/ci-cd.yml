@@ -97,7 +97,6 @@ jobs:
             -var "db_username=${{ secrets.DB_USERNAME }}" \
             -var "db_password=${{ secrets.DB_PASSWORD }}" \
             -var "my_ip=$MY_IP" \
-            -var-file=terraform/environments/${{ matrix.environment }}/terraform.tfvars
 
       - name: Terraform Apply
         run: |
@@ -108,7 +107,6 @@ jobs:
             -var "db_username=${{ secrets.DB_USERNAME }}" \
             -var "db_password=${{ secrets.DB_PASSWORD }}" \
             -var "my_ip=$MY_IP" \
-            -var-file=terraform/${{ matrix.environment }}.tfvars
 
       - name: Build Docker image
         run: docker build -t ${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.environment }} .
