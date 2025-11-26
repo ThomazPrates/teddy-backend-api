@@ -158,12 +158,14 @@ jobs:
           DATABASE_NAME: ${{ secrets.DATABASE_NAME || 'teddydb' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+          RDS_HOST=$(echo "${RDS_ENDPOINT}" | cut -d: -f1)
+          
           # Criar .env no EC2
           ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "mkdir -p /home/ec2-user/app && cat > /home/ec2-user/app/.env << EOF
           NODE_ENV=production
           PORT=3000
           BASE_URL=http://${EC2_IP}:3000
-          DATABASE_HOST=${RDS_ENDPOINT}
+          DATABASE_HOST=${RDS_HOST}
           DATABASE_PORT=5432
           DATABASE_USER=${DATABASE_USER}
           DATABASE_PASSWORD=${DATABASE_PASSWORD}
@@ -190,6 +192,9 @@ jobs:
             # Verificar se container está rodando
             sleep 10
             docker ps
+            # Verificar logs
+            echo "=== Logs do container ==="
+            docker logs --tail 50 teddy-backend-app || true
           DEPLOY_SCRIPT
           
           echo "✅ Deploy concluído! API disponível em: http://${EC2_IP}:3000"
@@ -308,12 +313,14 @@ jobs:
           DATABASE_NAME: ${{ secrets.DATABASE_NAME || 'teddydb' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+          RDS_HOST=$(echo "${RDS_ENDPOINT}" | cut -d: -f1)
+          
           # Criar .env no EC2
           ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "mkdir -p /home/ec2-user/app && cat > /home/ec2-user/app/.env << EOF
           NODE_ENV=production
           PORT=3000
           BASE_URL=http://${EC2_IP}:3000
-          DATABASE_HOST=${RDS_ENDPOINT}
+          DATABASE_HOST=${RDS_HOST}
           DATABASE_PORT=5432
           DATABASE_USER=${DATABASE_USER}
           DATABASE_PASSWORD=${DATABASE_PASSWORD}
@@ -340,6 +347,8 @@ jobs:
             # Verificar se container está rodando
             sleep 10
             docker ps
+            echo "=== Logs do container ==="
+            docker logs --tail 50 teddy-backend-app || true
           DEPLOY_SCRIPT
           
           echo "✅ Deploy concluído! API disponível em: http://${EC2_IP}:3000"
