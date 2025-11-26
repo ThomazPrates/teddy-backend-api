@@ -86,18 +86,18 @@ jobs:
           terraform_version: 1.6.0
 
       - name: Terraform Init
-        run: terraform -chdir=./terraform init -backend-config="env=dev"
+        run: terraform -chdir=./terraform/environments/${{ matrix.environment }} init -backend-config="env=${{ matrix.environment }}"
 
       - name: Terraform Plan
         run: |
-          terraform -chdir=./terraform plan \
+          terraform -chdir=./terraform/environments/${{ matrix.environment }} plan \
             -var "project_name=${{ secrets.PROJECT_NAME }}" \
             -var "environment=${{ matrix.environment }}" \
             -var "aws_region=${{ secrets.AWS_REGION }}" \
             -var "db_username=${{ secrets.DB_USERNAME }}" \
             -var "db_password=${{ secrets.DB_PASSWORD }}" \
             -var "my_ip=$MY_IP" \
-            -var-file=terraform/${{ matrix.environment }}.tfvars
+            -var-file=terraform/environments/${{ matrix.environment }}/terraform.tfvars
 
       - name: Terraform Apply
         run: |
