@@ -30,6 +30,8 @@ module "ec2" {
   source                 = "../../modules/ec2"
   project_name           = var.project_name
   environment            = var.environment
+  # ssh_public_key é opcional - se não fornecido, lê automaticamente de ~/.ssh/aws_key.pub
+  # No CI/CD, é passado via TF_VAR_ssh_public_key
   ssh_public_key         = var.ssh_public_key
   local_ssh_pub_file     = "~/.ssh/aws_key.pub"
   subnet_id              = module.networking.public_subnet_id

@@ -12,7 +12,6 @@ variable "ssh_public_key" {
   type        = string
   description = "Conteúdo da chave pública SSH"
   default     = ""
-  sensitive   = true
 }
 
 variable "local_ssh_pub_file" {

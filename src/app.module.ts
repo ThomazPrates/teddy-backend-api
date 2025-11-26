@@ -12,6 +12,13 @@ import { RedirectModule } from './redirect/redirect.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: [`.env.${process.env.NODE_ENV || 'development'}`, '.env'],
+      load: [() => ({
+        app: {
+          baseUrl: process.env.BASE_URL || process.env.API_URL || 'http://localhost:3000',
+          port: parseInt(process.env.PORT || '3000', 10),
+          nodeEnv: process.env.NODE_ENV || 'development',
+        },
+      })],
     }),
     TypeOrmModule.forRoot(getDatabaseConfig()),
     UserModule,

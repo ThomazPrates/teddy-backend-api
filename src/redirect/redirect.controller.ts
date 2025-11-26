@@ -20,8 +20,12 @@ export class RedirectController {
     description: 'Redirecionamento para a URL original',
     type: RedirectResponseDto,
   })
+  @ApiResponse({
+    status: 404,
+    description: 'URL não encontrada ou deletada',
+  })
   async redirect(@Param('code') code: string, @Res() res: Response) {
     const url = await this.redirectService.getOriginalUrl(code);
-    return res.redirect(url);
+    return res.redirect(302, url);
   }
 }

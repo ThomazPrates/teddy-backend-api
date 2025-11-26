@@ -1,5 +1,5 @@
 resource "aws_security_group" "ec2" {
-  name        = "${var.project_name}-ec2-sg"
+  name        = "${var.project_name}-${var.environment}-ec2-sg"
   description = "Security group for EC2 instance"
   vpc_id      = var.vpc_id
 
@@ -45,7 +45,7 @@ resource "aws_security_group" "ec2" {
 }
 
 resource "aws_security_group" "rds" {
-  name        = "${var.project_name}-rds-sg"
+  name        = "${var.project_name}-${var.environment}-rds-sg"
   description = "Security group for RDS instance"
   vpc_id      = var.vpc_id
 

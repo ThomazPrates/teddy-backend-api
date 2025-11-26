@@ -1,0 +1,484 @@
+{
+	"info": {
+		"_postman_id": "teddy-backend-api-collection",
+		"name": "Teddy Backend API",
+		"description": "Collection completa para testar todas as funcionalidades da API de encurtamento de URLs",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Autenticação",
+			"item": [
+				{
+					"name": "Criar Usuário",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('user_id', response.id);",
+									"    pm.environment.set('access_token', response.access_token);",
+									"    console.log('Usuário criado e token salvo!');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"teste@example.com\",\n    \"password\": \"senha123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users",
+							"host": ["{{base_url}}"],
+							"path": ["users"]
+						},
+						"description": "Cria um novo usuário e retorna o token JWT automaticamente"
+					},
+					"response": []
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('access_token', response.access_token);",
+									"    console.log('Login realizado e token salvo!');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"teste@example.com\",\n    \"password\": \"senha123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/auth/login",
+							"host": ["{{base_url}}"],
+							"path": ["auth", "login"]
+						},
+						"description": "Faz login e retorna o token JWT"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints de autenticação e criação de usuário"
+		},
+		{
+			"name": "2. Encurtar URLs",
+			"item": [
+				{
+					"name": "Criar URL Encurtada (Sem Autenticação)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('public_url_id', response.id);",
+									"    pm.environment.set('public_short_code', response.shortCode);",
+									"    console.log('URL pública criada:', response.shortUrl);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"originalUrl\": \"https://www.google.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/shorten",
+							"host": ["{{base_url}}"],
+							"path": ["shorten"]
+						},
+						"description": "Cria uma URL encurtada sem autenticação (slug gerado automaticamente)"
+					},
+					"response": []
+				},
+				{
+					"name": "Criar URL Encurtada (Com Autenticação)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('authenticated_url_id', response.id);",
+									"    pm.environment.set('authenticated_short_code', response.shortCode);",
+									"    console.log('URL autenticada criada:', response.shortUrl);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"originalUrl\": \"https://www.github.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/shorten",
+							"host": ["{{base_url}}"],
+							"path": ["shorten"]
+						},
+						"description": "Cria uma URL encurtada com autenticação (associada ao usuário)"
+					},
+					"response": []
+				},
+				{
+					"name": "Criar URL com Alias Customizado",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const response = pm.response.json();",
+									"    pm.environment.set('custom_alias_url_id', response.id);",
+									"    pm.environment.set('custom_alias_code', response.shortCode);",
+									"    console.log('URL com alias customizado criada:', response.shortUrl);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"originalUrl\": \"https://www.nestjs.com\",\n    \"alias\": \"nestjs-docs\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/shorten",
+							"host": ["{{base_url}}"],
+							"path": ["shorten"]
+						},
+						"description": "Cria uma URL encurtada com alias customizado (apenas usuários autenticados)"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para criar URLs encurtadas"
+		},
+		{
+			"name": "3. Gerenciar URLs",
+			"item": [
+				{
+					"name": "Listar Minhas URLs",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/shorten/my-urls",
+							"host": ["{{base_url}}"],
+							"path": ["shorten", "my-urls"]
+						},
+						"description": "Lista todas as URLs do usuário autenticado"
+					},
+					"response": []
+				},
+				{
+					"name": "Atualizar URL",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"originalUrl\": \"https://www.updated-url.com\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/shorten/my-urls/:id",
+							"host": ["{{base_url}}"],
+							"path": ["shorten", "my-urls", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{authenticated_url_id}}",
+									"description": "ID da URL a ser atualizada"
+								}
+							]
+						},
+						"description": "Atualiza a URL original de uma URL encurtada do usuário"
+					},
+					"response": []
+				},
+				{
+					"name": "Deletar URL (Soft Delete)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{access_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/shorten/my-urls/:id",
+							"host": ["{{base_url}}"],
+							"path": ["shorten", "my-urls", ":id"],
+							"variable": [
+								{
+									"key": "id",
+									"value": "{{authenticated_url_id}}",
+									"description": "ID da URL a ser deletada"
+								}
+							]
+						},
+						"description": "Faz soft delete de uma URL (marca como deletada, mas não remove do banco)"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints para gerenciar URLs do usuário autenticado"
+		},
+		{
+			"name": "4. Redirecionamento",
+			"item": [
+				{
+					"name": "Redirecionar por Código (Slug Gerado)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 302 (Redirect)', function () {",
+									"    pm.response.to.have.status(302);",
+									"});",
+									"",
+									"if (pm.response.code === 302) {",
+									"    console.log('Redirecionamento funcionou!');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/:code",
+							"host": ["{{base_url}}"],
+							"path": [":code"],
+							"variable": [
+								{
+									"key": "code",
+									"value": "{{public_short_code}}",
+									"description": "Código da URL encurtada"
+								}
+							]
+						},
+						"description": "Redireciona para a URL original usando o código encurtado"
+					},
+					"response": []
+				},
+				{
+					"name": "Redirecionar por Alias Customizado",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/:code",
+							"host": ["{{base_url}}"],
+							"path": [":code"],
+							"variable": [
+								{
+									"key": "code",
+									"value": "{{custom_alias_code}}",
+									"description": "Alias customizado"
+								}
+							]
+						},
+						"description": "Redireciona usando alias customizado"
+					},
+					"response": []
+				},
+				{
+					"name": "Tentar Acessar URL Deletada (404)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test('Status code is 404 (Not Found)', function () {",
+									"    pm.response.to.have.status(404);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/:code",
+							"host": ["{{base_url}}"],
+							"path": [":code"],
+							"variable": [
+								{
+									"key": "code",
+									"value": "{{deleted_url_code}}",
+									"description": "Código de uma URL deletada"
+								}
+							]
+						},
+						"description": "Tenta acessar uma URL que foi soft-deleted (deve retornar 404)"
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints de redirecionamento"
+		},
+		{
+			"name": "5. Documentação",
+			"item": [
+				{
+					"name": "Acessar Swagger UI",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api-docs",
+							"host": ["{{base_url}}"],
+							"path": ["api-docs"]
+						},
+						"description": "Acessa a documentação interativa da API (Swagger)"
+					},
+					"response": []
+				}
+			],
+			"description": "Acesso à documentação da API"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	]
+}
+

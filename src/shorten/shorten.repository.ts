@@ -1,5 +1,3 @@
-// src/shorten/shorten.repository.ts
-
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -20,8 +18,18 @@ export class ShortenRepository {
     return this.repo.save(url);
   }
 
-  findByShortCode(shortCode: string): Promise<Url> {
-    return this.repo.findOne({ where: { shortCode } });
+  findByShortCode(shortCode: string): Promise<Url | null> {
+    return this.repo.findOne({ 
+      where: { shortCode },
+    });
+  }
+
+  findByShortCodeCaseInsensitive(shortCode: string): Promise<Url | null> {
+    return this.repo
+      .createQueryBuilder('url')
+      .where('LOWER(url.shortCode) = LOWER(:shortCode)', { shortCode })
+      .andWhere('url.deletedAt IS NULL')
+      .getOne();
   }
 
   findWithDeleted(shortCode: string): Promise<Url> {

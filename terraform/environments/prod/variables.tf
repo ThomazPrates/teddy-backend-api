@@ -31,7 +31,8 @@ variable "my_ip" {
 }
 
 variable "ssh_public_key" {
-  description = "SSH public key for EC2 access"
+  description = "SSH public key for EC2 access (opcional - se não fornecido, lê de ~/.ssh/aws_key.pub)"
   type        = string
   sensitive   = true
+  default     = ""
 }
