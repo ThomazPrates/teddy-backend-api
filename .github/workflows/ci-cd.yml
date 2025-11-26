@@ -81,6 +81,24 @@ jobs:
       - name: Terraform Init
         run: terraform -chdir=./terraform/environments/dev init
 
+      - name: Try Import Existing SSH Key
+        continue-on-error: true
+        env:
+          TF_VAR_ssh_public_key: ${{ env.SSH_PUBLIC_KEY }}
+        run: |
+          KEY_NAME="${{ secrets.PROJECT_NAME }}-dev-key"
+          echo "🔑 Tentando importar chave SSH existente: ${KEY_NAME}"
+          terraform -chdir=./terraform/environments/dev import \
+            -var "project_name=${{ secrets.PROJECT_NAME }}" \
+            -var "environment=dev" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            -var "db_username=${{ secrets.DB_USERNAME }}" \
+            -var "db_password=${{ secrets.DB_PASSWORD }}" \
+            -var "my_ip=$MY_IP" \
+            -var "ssh_public_key=$SSH_PUBLIC_KEY" \
+            module.ec2.aws_key_pair.main \
+            "${KEY_NAME}" || echo "⚠️ Chave não existe ainda, será criada pelo Terraform"
+
       - name: Terraform Plan
         env:
           TF_VAR_ssh_public_key: ${{ env.SSH_PUBLIC_KEY }}
@@ -210,6 +228,24 @@ jobs:
 
       - name: Terraform Init
         run: terraform -chdir=./terraform/environments/prod init
+
+      - name: Try Import Existing SSH Key
+        continue-on-error: true
+        env:
+          TF_VAR_ssh_public_key: ${{ env.SSH_PUBLIC_KEY }}
+        run: |
+          KEY_NAME="${{ secrets.PROJECT_NAME }}-prod-key"
+          echo "🔑 Tentando importar chave SSH existente: ${KEY_NAME}"
+          terraform -chdir=./terraform/environments/prod import \
+            -var "project_name=${{ secrets.PROJECT_NAME }}" \
+            -var "environment=prod" \
+            -var "aws_region=${{ secrets.AWS_REGION }}" \
+            -var "db_username=${{ secrets.DB_USERNAME }}" \
+            -var "db_password=${{ secrets.DB_PASSWORD }}" \
+            -var "my_ip=$MY_IP" \
+            -var "ssh_public_key=$SSH_PUBLIC_KEY" \
+            module.ec2.aws_key_pair.main \
+            "${KEY_NAME}" || echo "⚠️ Chave não existe ainda, será criada pelo Terraform"
 
       - name: Terraform Plan
         env:

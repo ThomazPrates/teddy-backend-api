@@ -16,14 +16,15 @@ data "aws_ami" "amazon_linux_2" {
 locals {
   ssh_public_key_raw = var.ssh_public_key != "" ? var.ssh_public_key : file(pathexpand(var.local_ssh_pub_file))
   ssh_public_key_content = trimspace(replace(local.ssh_public_key_raw, "/[\r\n]+/", ""))
+  key_pair_name = "${var.project_name}-${var.environment}-key"
 }
 
 resource "aws_key_pair" "main" {
-  key_name   = "${var.project_name}-${var.environment}-key"
+  key_name   = local.key_pair_name
   public_key = local.ssh_public_key_content
 
   tags = {
-    Name        = "${var.project_name}-${var.environment}-key"
+    Name        = local.key_pair_name
     Environment = var.environment
   }
 }
