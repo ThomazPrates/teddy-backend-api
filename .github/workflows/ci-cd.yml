@@ -86,7 +86,7 @@ jobs:
           terraform_version: 1.6.0
 
       - name: Terraform Init
-        run: terraform init -backend-config="env=${{ matrix.environment }}" ./terraform
+        run: terraform -chdir=./terraform init -backend-config="env=dev"
 
       - name: Terraform Plan
         run: |
