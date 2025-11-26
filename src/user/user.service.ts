@@ -26,5 +26,8 @@ export class UserService {
       createdAt: savedUser.createdAt,
     };
   }
-}
 
+  async findAll() {
+    return await this.userRepository.findAll();
+  }
+}
