@@ -19,18 +19,10 @@
     "docker:up": "docker-compose up",
     "docker:down": "docker-compose down",
     "docker:build": "docker-compose build",
-    "terraform:init:dev": "terraform -chdir=./terraform/environments/dev init",
-    "terraform:init:prod": "terraform -chdir=./terraform/environments/prod init",
-    "terraform:plan:dev": "terraform -chdir=./terraform/environments/dev plan -var-file=terraform.tfvars",
-    "terraform:plan:prod": "terraform -chdir=./terraform/environments/prod plan -var-file=terraform.tfvars",
-    "terraform:apply:dev": "terraform -chdir=./terraform/environments/dev apply -var-file=terraform.tfvars -auto-approve",
-    "terraform:apply:prod": "terraform -chdir=./terraform/environments/prod apply -var-file=terraform.tfvars -auto-approve",
-    "terraform:destroy:dev": "terraform -chdir=./terraform/environments/dev destroy -var-file=terraform.tfvars -auto-approve",
-    "terraform:destroy:prod": "terraform -chdir=./terraform/environments/prod destroy -var-file=terraform.tfvars -auto-approve",
     "terraform:output:dev": "terraform -chdir=./terraform/environments/dev output",
     "terraform:output:prod": "terraform -chdir=./terraform/environments/prod output",
-    "deploy": "npm run build && npm run terraform:apply:dev",
-    "deploy:prod": "npm run build && npm run terraform:apply:prod"
+    "terraform:destroy:dev": "terraform -chdir=./terraform/environments/dev destroy -var-file=terraform.tfvars -auto-approve",
+    "terraform:destroy:prod": "terraform -chdir=./terraform/environments/prod destroy -var-file=terraform.tfvars -auto-approve"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.20",

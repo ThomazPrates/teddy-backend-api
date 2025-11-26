@@ -310,9 +310,9 @@ graph TB
 
 ### DevOps
 - **Docker** & **Docker Compose** - Containerização
-- **Terraform** - Infraestrutura como código
+- **Terraform** - Infraestrutura como código (gerenciado via CI/CD)
 - **AWS** - Cloud provider (EC2, RDS)
-- **GitHub Actions** - CI/CD
+- **GitHub Actions** - CI/CD e deploy automatizado
 
 ## 📦 Pré-requisitos
 
@@ -320,9 +320,7 @@ Antes de começar, você precisa ter instalado:
 
 - **Node.js** (v20 ou superior)
 - **npm** ou **yarn**
-- **Docker** e **Docker Compose**
-- **Terraform** (v1.6.0 ou superior)
-- **AWS CLI** configurado
+- **Docker** e **Docker Compose** (para desenvolvimento local)
 - **Git**
 
 ## 🚀 Instalação
@@ -369,29 +367,7 @@ BASE_URL=http://localhost:3000  # URL base da API (usada para gerar URLs encurta
 > - **Produção**: `http://<EC2_IP>:3000` ou `https://api.seudominio.com`
 > - **Alternativa**: Você pode usar `API_URL` em vez de `BASE_URL` (BASE_URL tem prioridade)
 
-### Terraform
-
-Configure os arquivos `terraform.tfvars` em cada ambiente:
-
-**`terraform/environments/dev/terraform.tfvars`**
-```hcl
-aws_region   = "us-east-1"
-project_name = "teddy-backend-api"
-environment  = "dev"
-db_username  = "postgres"
-db_password  = "your-password"
-my_ip        = "your-ip-address"
-```
-
-**`terraform/environments/prod/terraform.tfvars`**
-```hcl
-aws_region   = "us-east-1"
-project_name = "teddy-backend-api"
-environment  = "prod"
-db_username  = "postgres"
-db_password  = "your-password"
-my_ip        = "your-ip-address"
-```
+> **Nota**: A configuração do Terraform é feita automaticamente via CI/CD usando os secrets do GitHub. Não é necessário configurar arquivos `terraform.tfvars` manualmente.
 
 ## 🏃 Executando o Projeto
 
@@ -485,29 +461,15 @@ A documentação interativa da API está disponível via Swagger:
 | `npm run docker:down` | Para e remove os containers |
 | `npm run docker:build` | Constrói as imagens Docker |
 
-### Terraform - Desenvolvimento
+### Terraform (Apenas para Troubleshooting)
 | Comando | Descrição |
 |---------|-----------|
-| `npm run terraform:init:dev` | Inicializa Terraform para dev |
-| `npm run terraform:plan:dev` | Mostra o plano de execução para dev |
-| `npm run terraform:apply:dev` | Aplica a infraestrutura em dev |
-| `npm run terraform:destroy:dev` | Destrói a infraestrutura em dev |
-| `npm run terraform:output:dev` | Mostra os outputs do Terraform em dev |
+| `npm run terraform:output:dev` | Mostra os outputs do Terraform em dev (IP do EC2, RDS endpoint) |
+| `npm run terraform:output:prod` | Mostra os outputs do Terraform em prod (IP do EC2, RDS endpoint) |
+| `npm run terraform:destroy:dev` | ⚠️ Destrói a infraestrutura em dev (use com cuidado) |
+| `npm run terraform:destroy:prod` | ⚠️ Destrói a infraestrutura em prod (use com cuidado) |
 
-### Terraform - Produção
-| Comando | Descrição |
-|---------|-----------|
-| `npm run terraform:init:prod` | Inicializa Terraform para prod |
-| `npm run terraform:plan:prod` | Mostra o plano de execução para prod |
-| `npm run terraform:apply:prod` | Aplica a infraestrutura em prod |
-| `npm run terraform:destroy:prod` | Destrói a infraestrutura em prod |
-| `npm run terraform:output:prod` | Mostra os outputs do Terraform em prod |
-
-### Deploy
-| Comando | Descrição |
-|---------|-----------|
-| `npm run deploy` | Build + aplica Terraform em dev |
-| `npm run deploy:prod` | Build + aplica Terraform em prod |
+> **Nota**: O deploy é feito automaticamente via CI/CD. Os comandos acima são apenas para troubleshooting e destruição de recursos quando necessário.
 
 ## 🧪 Testes
 
@@ -544,42 +506,25 @@ O projeto utiliza GitHub Actions para automação de CI/CD.
 
 ## 🚢 Deploy
 
-### Passo a Passo
+O deploy é feito **automaticamente via CI/CD** quando você faz push para as branches `develop` ou `main`.
 
-1. **Configure as credenciais AWS**:
-   - Configure o AWS CLI
-   - Configure os secrets no GitHub (Settings → Secrets and variables → Actions):
-     - `AWS_ACCESS_KEY_ID` - Credencial de acesso AWS
-     - `AWS_SECRET_ACCESS_KEY` - Chave secreta AWS
-     - `AWS_REGION` - Região AWS (ex: `us-east-1`)
-     - `PROJECT_NAME` - Nome do projeto
-     - `DB_USERNAME` - Usuário do banco de dados
-     - `DB_PASSWORD` - Senha do banco de dados
-     - `DATABASE_NAME` - Nome do banco (opcional, padrão: `teddydb`)
-     - `JWT_SECRET` - Secret para assinatura JWT
-     - `EC2_SSH_PRIVATE_KEY` - Chave privada SSH para acesso ao EC2
+### Configuração Inicial
 
-2. **Configure os arquivos Terraform**:
-   - Edite `terraform/environments/dev/terraform.tfvars`
-   - Edite `terraform/environments/prod/terraform.tfvars`
+1. **Configure os secrets no GitHub** (Settings → Secrets and variables → Actions):
+   - `AWS_ACCESS_KEY_ID` - Credencial de acesso AWS
+   - `AWS_SECRET_ACCESS_KEY` - Chave secreta AWS
+   - `AWS_REGION` - Região AWS (ex: `us-east-1`)
+   - `PROJECT_NAME` - Nome do projeto
+   - `DB_USERNAME` - Usuário do banco de dados
+   - `DB_PASSWORD` - Senha do banco de dados
+   - `DATABASE_NAME` - Nome do banco (opcional, padrão: `teddydb`)
+   - `JWT_SECRET` - Secret para assinatura JWT
 
-3. **Deploy Manual**:
-```bash
-# Desenvolvimento
-npm run terraform:init:dev
-npm run terraform:plan:dev
-npm run terraform:apply:dev
+2. **Faça push para a branch apropriada**:
+   - Push para `develop` → deploy automático em **dev**
+   - Push para `main` → deploy automático em **prod**
 
-# Produção
-npm run terraform:init:prod
-npm run terraform:plan:prod
-npm run terraform:apply:prod
-```
-
-4. **Deploy Automático via CI/CD**:
-   - Faça push para `develop` → deploy automático em dev
-   - Faça push para `main` → deploy automático em prod
-   - A `BASE_URL` é configurada automaticamente usando o IP do EC2: `http://<EC2_IP>:3000`
+3. **A `BASE_URL` é configurada automaticamente** usando o IP do EC2: `http://<EC2_IP>:3000`
 
 ### Infraestrutura
 
@@ -591,10 +536,13 @@ A infraestrutura na AWS inclui:
 
 ### Acessando a API após Deploy
 
-Após o deploy, você pode acessar a API usando:
+Após o deploy via CI/CD, você pode obter o IP do EC2 e acessar a API:
 
 ```bash
-# Obter o IP do EC2
+# Obter o IP do EC2 (usando npm script)
+npm run terraform:output:prod
+
+# Ou diretamente com Terraform
 terraform -chdir=./terraform/environments/prod output ec2_public_ip
 
 # Acessar a API
@@ -606,7 +554,7 @@ curl -X POST http://<EC2_IP>:3000/shorten \
   -d '{"originalUrl": "https://www.example.com"}'
 ```
 
-> **Importante**: A `BASE_URL` é configurada automaticamente no deploy para usar o IP do EC2. Se você tiver um domínio, configure `BASE_URL=https://api.seudominio.com` no secret do GitHub ou no arquivo `.env` do EC2.
+> **Importante**: A `BASE_URL` é configurada automaticamente no deploy para usar o IP do EC2: `http://<EC2_IP>:3000`. Se você tiver um domínio, adicione o secret `BASE_URL=https://api.seudominio.com` no GitHub.
 
 ## 📁 Estrutura do Projeto
 
@@ -643,17 +591,17 @@ teddy-backend-api/
 
 ## 📈 Escalabilidade
 
-### Escala Vertical
+### Escala Vertical  
 - Aumentar recursos da instância EC2 (CPU, RAM)
 - Aumentar recursos do RDS (CPU, memória, armazenamento)
 - ⚠️ Pode causar downtime temporário durante upgrades
 
-### Escala Horizontal
+### Escala Horizontal  
 - **EC2**: Usar Auto Scaling Groups para criar/remover instâncias automaticamente
 - **RDS**: Criar réplicas de leitura para distribuir carga de leitura
 - **Load Balancer**: Usar ELB/ALB para distribuir requisições entre instâncias
 
-### Desafios e Soluções
+### Desafios e Soluções  
 - **Sincronização de dados**: Réplicas RDS são somente leitura; escritas vão para instância principal
 - **Gerenciamento de estado**: Usar balanceadores de carga (ELB/ALB) para múltiplas instâncias
 - **Monitoramento**: Configurar CloudWatch para monitorar uso e performance

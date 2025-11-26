@@ -129,8 +129,10 @@ jobs:
       - name: Get EC2 IP and RDS Endpoint
         id: terraform_output
         run: |
-          echo "ec2_ip=$(terraform -chdir=./terraform/environments/dev output -raw ec2_public_ip)" >> $GITHUB_OUTPUT
-          echo "rds_endpoint=$(terraform -chdir=./terraform/environments/dev output -raw rds_endpoint)" >> $GITHUB_OUTPUT
+          EC2_IP=$(terraform -chdir=./terraform/environments/dev output -raw -no-color ec2_public_ip 2>/dev/null | tr -d '\n')
+          RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/dev output -raw -no-color rds_endpoint 2>/dev/null | tr -d '\n')
+          echo "ec2_ip=${EC2_IP}" >> $GITHUB_OUTPUT
+          echo "rds_endpoint=${RDS_ENDPOINT}" >> $GITHUB_OUTPUT
 
       - name: Setup SSH
         run: |
@@ -277,8 +279,10 @@ jobs:
       - name: Get EC2 IP and RDS Endpoint
         id: terraform_output
         run: |
-          echo "ec2_ip=$(terraform -chdir=./terraform/environments/prod output -raw ec2_public_ip)" >> $GITHUB_OUTPUT
-          echo "rds_endpoint=$(terraform -chdir=./terraform/environments/prod output -raw rds_endpoint)" >> $GITHUB_OUTPUT
+          EC2_IP=$(terraform -chdir=./terraform/environments/prod output -raw -no-color ec2_public_ip 2>/dev/null | tr -d '\n')
+          RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/prod output -raw -no-color rds_endpoint 2>/dev/null | tr -d '\n')
+          echo "ec2_ip=${EC2_IP}" >> $GITHUB_OUTPUT
+          echo "rds_endpoint=${RDS_ENDPOINT}" >> $GITHUB_OUTPUT
 
       - name: Setup SSH
         run: |
