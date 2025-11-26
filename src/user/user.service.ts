@@ -18,7 +18,7 @@ export class UserService {
 
     const savedUser = await this.userRepository.create({
       email: createUserDto.email,
-      password: createUserDto.password, // Em produção, usar hash de senha
+      password: createUserDto.password,
     });
 
     return {
