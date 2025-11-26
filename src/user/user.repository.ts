@@ -40,4 +40,3 @@ export class UserRepository {
     await this.repository.delete(id);
   }
 }
-
