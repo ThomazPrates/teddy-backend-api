@@ -1,7 +1,7 @@
 {
   "name": "teddy-backend-api",
   "version": "0.0.1",
-  "description": "",
+  "description": "Project to shorter urls to users",
   "author": "",
   "private": true,
   "license": "MIT",
@@ -15,7 +15,6 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
     "docker:up": "docker-compose up",
     "docker:down": "docker compose -f infrastructure/docker/docker-compose.yml down",
     "terraform:init:dev": "cd terraform && terraform init",
@@ -32,12 +31,12 @@
     "deploy:prod": "npm run build && npm run terraform:apply:prod"
   },
   "dependencies": {
-    "@nestjs/common": "^10.0.0",
+    "@nestjs/common": "^10.4.20",
     "@nestjs/config": "^4.0.2",
-    "@nestjs/core": "^10.0.0",
+    "@nestjs/core": "^10.4.20",
     "@nestjs/jwt": "^11.0.1",
     "@nestjs/platform-express": "^10.0.0",
-    "@nestjs/swagger": "^11.2.3",
+    "@nestjs/swagger": "^8",
     "@nestjs/typeorm": "^11.0.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
