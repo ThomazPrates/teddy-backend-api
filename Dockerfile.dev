@@ -5,6 +5,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
+RUN ls
+
 # Install all dependencies (including dev)
 RUN npm install
 
@@ -15,5 +17,5 @@ COPY . .
 EXPOSE 3000
 
 # Start in development mode with watch
-CMD ["npm", "run", "start:dev"]
+CMD ["npm", "run", "start:debug"]
 

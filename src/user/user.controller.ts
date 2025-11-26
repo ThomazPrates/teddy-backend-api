@@ -4,10 +4,10 @@ import {
   Body,
   HttpCode,
   HttpStatus,
-  Get,
 } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import { CreateUserRequestDto } from './dto/create-user-request.dto';
+import { CreateUserResponseDto } from './dto/create-user-response.dto';
 
 @Controller('users')
 export class UserController {
@@ -15,12 +15,9 @@ export class UserController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createUserDto: CreateUserDto) {
+  async create(
+    @Body() createUserDto: CreateUserRequestDto,
+  ): Promise<CreateUserResponseDto> {
     return this.userService.create(createUserDto);
-  }
-
-  @Get()
-  findAll() {
-    return this.userService.findAll();
   }
 }

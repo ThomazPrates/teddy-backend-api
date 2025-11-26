@@ -4,7 +4,9 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { Url } from '../../shorten/entities/url.entity';
 
 @Entity('users')
 export class User {
@@ -22,4 +24,7 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => Url, url => url.owner)
+  urls: Url[];
 }

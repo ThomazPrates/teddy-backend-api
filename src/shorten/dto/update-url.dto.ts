@@ -4,4 +4,3 @@ export class UpdateUrlDto {
   @IsUrl()
   originalUrl: string;
 }
-
