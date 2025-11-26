@@ -1,7 +1,0 @@
-aws_region  = "us-east-1"
-project_name = "teddy-backend-api"
-environment = "prod"
-db_username = "postgres"
-db_password = "CHANGE_ME_PRODUCTION_PASSWORD"
-my_ip       = "179.218.23.204"
-

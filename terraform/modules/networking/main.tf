@@ -1,4 +1,3 @@
-# VPC
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_hostnames = true
@@ -10,7 +9,6 @@ resource "aws_vpc" "main" {
   }
 }
 
-# Internet Gateway
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
@@ -20,7 +18,6 @@ resource "aws_internet_gateway" "main" {
   }
 }
 
-# Public Subnet
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
@@ -33,7 +30,6 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Private Subnet 1
 resource "aws_subnet" "private_1" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.2.0/24"
@@ -45,7 +41,6 @@ resource "aws_subnet" "private_1" {
   }
 }
 
-# Private Subnet 2 (RDS precisa de 2 subnets)
 resource "aws_subnet" "private_2" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = "10.0.3.0/24"
@@ -57,7 +52,6 @@ resource "aws_subnet" "private_2" {
   }
 }
 
-# Route Table
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -72,13 +66,11 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Route Table Association
 resource "aws_route_table_association" "public" {
   subnet_id      = aws_subnet.public.id
   route_table_id = aws_route_table.public.id
 }
 
-# DB Subnet Group
 resource "aws_db_subnet_group" "main" {
   name       = "${var.project_name}-db-subnet-group"
   subnet_ids = [aws_subnet.private_1.id, aws_subnet.private_2.id]
@@ -88,4 +80,3 @@ resource "aws_db_subnet_group" "main" {
     Environment = var.environment
   }
 }
-

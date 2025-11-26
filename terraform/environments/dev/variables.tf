@@ -1,26 +1,27 @@
 variable "aws_region" {
   description = "AWS Region"
-  default     = "us-east-1"
+  type        = string
 }
 
 variable "project_name" {
   description = "Project name"
-  default     = "mvp-teddy"
+  type        = string
 }
 
 variable "environment" {
   description = "Environment"
-  default     = "dev"
+  type        = string
 }
 
 variable "db_username" {
   description = "Database username"
-  default     = "postgres"
+  type        = string
   sensitive   = true
 }
 
 variable "db_password" {
   description = "Database password"
+  type        = string
   sensitive   = true
 }
 
@@ -32,7 +33,5 @@ variable "my_ip" {
 variable "ssh_public_key" {
   description = "SSH public key for EC2 access"
   type        = string
-  default     = ""
   sensitive   = true
 }
-

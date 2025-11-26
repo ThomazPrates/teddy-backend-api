@@ -9,4 +9,3 @@ export function generateShortCode(): string {
   }
   return code;
 }
-
