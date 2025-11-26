@@ -15,6 +15,7 @@ describe('ShortenController', () => {
     listByOwner: jest.fn(),
     updateUrl: jest.fn(),
     softDelete: jest.fn(),
+    toShortUrlResponse: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -51,20 +52,37 @@ describe('ShortenController', () => {
         originalUrl: 'https://example.com',
       };
       const req = { user: { userId: 1 } };
-      const expectedResult = {
+      const mockUrl = {
         id: 1,
         shortCode: 'abc123',
         originalUrl: 'https://example.com',
-        userId: 1,
+        owner: { id: 1 },
+        accessCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const expectedResponse = {
+        id: 1,
+        originalUrl: 'https://example.com',
+        shortUrl: 'http://localhost:3000/abc123',
+        shortCode: 'abc123',
+        alias: 'abc123',
+        accessCount: 0,
+        ownerId: 1,
+        createdAt: mockUrl.createdAt,
+        updatedAt: mockUrl.updatedAt,
       };
 
-      mockShortenService.createShortUrl.mockResolvedValue(expectedResult);
+      mockShortenService.createShortUrl.mockResolvedValue(mockUrl);
+      mockShortenService.toShortUrlResponse.mockReturnValue(expectedResponse);
 
       const result = await controller.create(dto, req);
 
-      expect(result).toEqual(expectedResult);
+      expect(result).toEqual(expectedResponse);
       expect(service.createShortUrl).toHaveBeenCalledWith(dto, 1);
       expect(service.createShortUrl).toHaveBeenCalledTimes(1);
+      expect(service.toShortUrlResponse).toHaveBeenCalledWith(mockUrl);
+      expect(service.toShortUrlResponse).toHaveBeenCalledTimes(1);
     });
 
     it('should create a short URL without authenticated user', async () => {
@@ -72,20 +90,37 @@ describe('ShortenController', () => {
         originalUrl: 'https://example.com',
       };
       const req = { user: undefined };
-      const expectedResult = {
+      const mockUrl = {
         id: 1,
         shortCode: 'abc123',
         originalUrl: 'https://example.com',
-        userId: null,
+        owner: null,
+        accessCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      const expectedResponse = {
+        id: 1,
+        originalUrl: 'https://example.com',
+        shortUrl: 'http://localhost:3000/abc123',
+        shortCode: 'abc123',
+        alias: 'abc123',
+        accessCount: 0,
+        ownerId: undefined,
+        createdAt: mockUrl.createdAt,
+        updatedAt: mockUrl.updatedAt,
       };
 
-      mockShortenService.createShortUrl.mockResolvedValue(expectedResult);
+      mockShortenService.createShortUrl.mockResolvedValue(mockUrl);
+      mockShortenService.toShortUrlResponse.mockReturnValue(expectedResponse);
 
       const result = await controller.create(dto, req);
 
-      expect(result).toEqual(expectedResult);
+      expect(result).toEqual(expectedResponse);
       expect(service.createShortUrl).toHaveBeenCalledWith(dto, undefined);
       expect(service.createShortUrl).toHaveBeenCalledTimes(1);
+      expect(service.toShortUrlResponse).toHaveBeenCalledWith(mockUrl);
+      expect(service.toShortUrlResponse).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -95,15 +130,25 @@ describe('ShortenController', () => {
       const expectedResult = [
         {
           id: 1,
-          shortCode: 'abc123',
           originalUrl: 'https://example.com',
-          userId: 1,
+          shortUrl: 'http://localhost:3000/abc123',
+          shortCode: 'abc123',
+          alias: 'abc123',
+          accessCount: 0,
+          ownerId: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
         {
           id: 2,
-          shortCode: 'def456',
           originalUrl: 'https://example2.com',
-          userId: 1,
+          shortUrl: 'http://localhost:3000/def456',
+          shortCode: 'def456',
+          alias: 'def456',
+          accessCount: 0,
+          ownerId: 1,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ];
 
@@ -138,9 +183,14 @@ describe('ShortenController', () => {
       const req = { user: { userId: 1 } };
       const expectedResult = {
         id: 1,
-        shortCode: 'abc123',
         originalUrl: 'https://updated-example.com',
-        userId: 1,
+        shortUrl: 'http://localhost:3000/abc123',
+        shortCode: 'abc123',
+        alias: 'abc123',
+        accessCount: 0,
+        ownerId: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
       mockShortenService.updateUrl.mockResolvedValue(expectedResult);

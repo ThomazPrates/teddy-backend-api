@@ -50,7 +50,7 @@ describe('RedirectController', () => {
       const result = await controller.redirect(code, res);
 
       expect(service.getOriginalUrl).toHaveBeenCalledWith(code);
-      expect(res.redirect).toHaveBeenCalledWith(originalUrl);
+      expect(res.redirect).toHaveBeenCalledWith(302, originalUrl);
       expect(result).toEqual(res);
     });
 

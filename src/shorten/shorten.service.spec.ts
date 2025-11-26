@@ -8,6 +8,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Url } from './entities/url.entity';
 import { User } from '../user/entities/user.entity';
 import * as shortCodeHelper from '../shared/helpers/short-code.helper';
@@ -26,6 +27,16 @@ describe('ShortenService', () => {
     findByShortCode: jest.fn(),
     listByOwner: jest.fn(),
     softDelete: jest.fn(),
+    findByShortCodeCaseInsensitive: jest.fn(),
+  };
+
+  const mockConfigService = {
+    get: jest.fn((key: string, defaultValue?: any) => {
+      if (key === 'app.baseUrl') {
+        return 'http://localhost:3000';
+      }
+      return defaultValue;
+    }),
   };
 
   beforeEach(async () => {
@@ -35,6 +46,10 @@ describe('ShortenService', () => {
         {
           provide: ShortenRepository,
           useValue: mockRepository,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService,
         },
       ],
     }).compile();
@@ -79,7 +94,7 @@ describe('ShortenService', () => {
       expect(repository.findWithDeleted).toHaveBeenCalledWith(generatedCode);
       expect(repository.create).toHaveBeenCalledWith({
         shortCode: generatedCode,
-        originalUrl: dto.originalUrl,
+        originalUrl: dto.originalUrl.trim(),
         owner: { id: ownerId },
       });
       expect(repository.save).toHaveBeenCalledWith(mockUrl);
@@ -112,7 +127,7 @@ describe('ShortenService', () => {
       expect(result).toEqual(mockUrl);
       expect(repository.create).toHaveBeenCalledWith({
         shortCode: generatedCode,
-        originalUrl: dto.originalUrl,
+        originalUrl: dto.originalUrl.trim(),
         owner: undefined,
       });
     });
@@ -124,7 +139,7 @@ describe('ShortenService', () => {
       };
       const ownerId = 1;
 
-      (shortCodeHelper.SHORT_CODE_LENGTH as number) = 6;
+      mockRepository.findByShortCodeCaseInsensitive.mockResolvedValue(null);
       mockRepository.findWithDeleted.mockResolvedValue(null);
 
       const mockUrl = {
@@ -140,6 +155,7 @@ describe('ShortenService', () => {
       const result = await service.createShortUrl(dto, ownerId);
 
       expect(result).toEqual(mockUrl);
+      expect(repository.findByShortCodeCaseInsensitive).toHaveBeenCalledWith('custom');
       expect(repository.findWithDeleted).toHaveBeenCalledWith('custom');
     });
 
@@ -157,20 +173,18 @@ describe('ShortenService', () => {
       );
     });
 
-    it('should throw BadRequestException when alias has wrong length', async () => {
+    it('should throw BadRequestException when alias is a reserved route', async () => {
       const dto: CreateShortUrlDto = {
         originalUrl: 'https://example.com',
-        alias: 'short',
+        alias: 'auth',
       };
       const ownerId = 1;
-
-      (shortCodeHelper.SHORT_CODE_LENGTH as number) = 6;
 
       await expect(service.createShortUrl(dto, ownerId)).rejects.toThrow(
         BadRequestException,
       );
       await expect(service.createShortUrl(dto, ownerId)).rejects.toThrow(
-        'O código precisa ter 6 caracteres.',
+        'O alias "auth" é uma rota reservada e não pode ser usado',
       );
     });
 
@@ -181,11 +195,10 @@ describe('ShortenService', () => {
       };
       const ownerId = 1;
 
-      (shortCodeHelper.SHORT_CODE_LENGTH as number) = 6;
-      mockRepository.findWithDeleted.mockResolvedValue({
+      mockRepository.findByShortCodeCaseInsensitive.mockResolvedValue({
         id: 1,
         shortCode: 'exists',
-      });
+      } as Url);
 
       await expect(service.createShortUrl(dto, ownerId)).rejects.toThrow(
         BadRequestException,
@@ -193,6 +206,7 @@ describe('ShortenService', () => {
       await expect(service.createShortUrl(dto, ownerId)).rejects.toThrow(
         'Alias já está em uso',
       );
+      expect(repository.findByShortCodeCaseInsensitive).toHaveBeenCalledWith('exists');
     });
 
     it('should generate unique code when first attempt collides', async () => {
@@ -240,12 +254,18 @@ describe('ShortenService', () => {
           shortCode: 'abc123',
           originalUrl: 'https://example.com',
           owner: { id: ownerId } as User,
+          accessCount: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
         {
           id: 2,
           shortCode: 'def456',
           originalUrl: 'https://example2.com',
           owner: { id: ownerId } as User,
+          accessCount: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ] as Url[];
 
@@ -253,7 +273,10 @@ describe('ShortenService', () => {
 
       const result = await service.listByOwner(ownerId);
 
-      expect(result).toEqual(mockUrls);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toHaveProperty('shortUrl');
+      expect(result[0].shortUrl).toBe('http://localhost:3000/abc123');
+      expect(result[1].shortUrl).toBe('http://localhost:3000/def456');
       expect(repository.listByOwner).toHaveBeenCalledWith(ownerId);
     });
 
@@ -293,7 +316,9 @@ describe('ShortenService', () => {
 
       const result = await service.updateUrl(id, ownerId, dto);
 
+      expect(result).toHaveProperty('shortUrl');
       expect(result.originalUrl).toBe(dto.originalUrl);
+      expect(result.shortUrl).toBe('http://localhost:3000/abc123');
       expect(repository.findById).toHaveBeenCalledWith(id);
       expect(repository.save).toHaveBeenCalled();
     });
