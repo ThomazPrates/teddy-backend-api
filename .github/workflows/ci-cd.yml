@@ -295,21 +295,37 @@ jobs:
             exit 1
           fi
           
-          echo "📝 Criando .env no EC2 com DATABASE_HOST=${RDS_HOST}"
+          # Validar que JWT_SECRET está definido
+          if [[ -z "${JWT_SECRET}" ]]; then
+            echo "❌ ERRO: JWT_SECRET não está definido"
+            exit 1
+          fi
           
-          # Criar .env no EC2
-          ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "mkdir -p /home/ec2-user/app && cat > /home/ec2-user/app/.env << EOF
-          NODE_ENV=production
-          PORT=3000
-          BASE_URL=http://${EC2_IP}:3000
-          DATABASE_HOST=${RDS_HOST}
-          DATABASE_PORT=5432
-          DATABASE_USER=${DATABASE_USER}
-          DATABASE_PASSWORD=${DATABASE_PASSWORD}
-          DATABASE_NAME=${DATABASE_NAME}
-          JWT_SECRET=${JWT_SECRET}
-          JWT_EXPIRES_IN=1d
-          EOF"
+          echo "📝 Criando .env no EC2 com DATABASE_HOST=${RDS_HOST}"
+          echo "🔐 Verificando JWT_SECRET (primeiros 4 caracteres): ${JWT_SECRET:0:4}..."
+          
+          # Criar conteúdo do .env localmente (expandir variáveis do GitHub Actions)
+          {
+            echo "NODE_ENV=production"
+            echo "PORT=3000"
+            echo "BASE_URL=http://${EC2_IP}:3000"
+            echo "DATABASE_HOST=${RDS_HOST}"
+            echo "DATABASE_PORT=5432"
+            echo "DATABASE_USER=${DATABASE_USER}"
+            echo "DATABASE_PASSWORD=${DATABASE_PASSWORD}"
+            echo "DATABASE_NAME=${DATABASE_NAME}"
+            echo "JWT_SECRET=${JWT_SECRET}"
+            echo "JWT_EXPIRES_IN=1d"
+          } > /tmp/ec2.env
+          
+          # Enviar .env para o EC2
+          scp -i ~/.ssh/aws_key -o StrictHostKeyChecking=no /tmp/ec2.env ec2-user@${EC2_IP}:/home/ec2-user/app/.env
+          
+          # Verificar se JWT_SECRET foi escrito corretamente
+          ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "if grep -q 'JWT_SECRET=' /home/ec2-user/app/.env; then JWT_VALUE=\$(grep 'JWT_SECRET=' /home/ec2-user/app/.env | cut -d= -f2); if [ -z \"\$JWT_VALUE\" ]; then echo '❌ ERRO: JWT_SECRET está vazio no .env'; exit 1; else echo \"✅ JWT_SECRET foi definido no .env (tamanho: \${#JWT_VALUE} caracteres)\"; fi; else echo '❌ ERRO: JWT_SECRET não foi encontrado no .env'; exit 1; fi"
+          
+          # Limpar arquivo temporário
+          rm -f /tmp/ec2.env
           
           # Enviar código
           # Ignorar avisos de arquivos modificados durante a criação do tar
@@ -633,21 +649,37 @@ jobs:
             exit 1
           fi
           
-          echo "📝 Criando .env no EC2 com DATABASE_HOST=${RDS_HOST}"
+          # Validar que JWT_SECRET está definido
+          if [[ -z "${JWT_SECRET}" ]]; then
+            echo "❌ ERRO: JWT_SECRET não está definido"
+            exit 1
+          fi
           
-          # Criar .env no EC2
-          ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "mkdir -p /home/ec2-user/app && cat > /home/ec2-user/app/.env << EOF
-          NODE_ENV=production
-          PORT=3000
-          BASE_URL=http://${EC2_IP}:3000
-          DATABASE_HOST=${RDS_HOST}
-          DATABASE_PORT=5432
-          DATABASE_USER=${DATABASE_USER}
-          DATABASE_PASSWORD=${DATABASE_PASSWORD}
-          DATABASE_NAME=${DATABASE_NAME}
-          JWT_SECRET=${JWT_SECRET}
-          JWT_EXPIRES_IN=1d
-          EOF"
+          echo "📝 Criando .env no EC2 com DATABASE_HOST=${RDS_HOST}"
+          echo "🔐 Verificando JWT_SECRET (primeiros 4 caracteres): ${JWT_SECRET:0:4}..."
+          
+          # Criar conteúdo do .env localmente (expandir variáveis do GitHub Actions)
+          {
+            echo "NODE_ENV=production"
+            echo "PORT=3000"
+            echo "BASE_URL=http://${EC2_IP}:3000"
+            echo "DATABASE_HOST=${RDS_HOST}"
+            echo "DATABASE_PORT=5432"
+            echo "DATABASE_USER=${DATABASE_USER}"
+            echo "DATABASE_PASSWORD=${DATABASE_PASSWORD}"
+            echo "DATABASE_NAME=${DATABASE_NAME}"
+            echo "JWT_SECRET=${JWT_SECRET}"
+            echo "JWT_EXPIRES_IN=1d"
+          } > /tmp/ec2.env
+          
+          # Enviar .env para o EC2
+          scp -i ~/.ssh/aws_key -o StrictHostKeyChecking=no /tmp/ec2.env ec2-user@${EC2_IP}:/home/ec2-user/app/.env
+          
+          # Verificar se JWT_SECRET foi escrito corretamente
+          ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "if grep -q 'JWT_SECRET=' /home/ec2-user/app/.env; then JWT_VALUE=\$(grep 'JWT_SECRET=' /home/ec2-user/app/.env | cut -d= -f2); if [ -z \"\$JWT_VALUE\" ]; then echo '❌ ERRO: JWT_SECRET está vazio no .env'; exit 1; else echo \"✅ JWT_SECRET foi definido no .env (tamanho: \${#JWT_VALUE} caracteres)\"; fi; else echo '❌ ERRO: JWT_SECRET não foi encontrado no .env'; exit 1; fi"
+          
+          # Limpar arquivo temporário
+          rm -f /tmp/ec2.env
           
           # Enviar código
           # Ignorar avisos de arquivos modificados durante a criação do tar
