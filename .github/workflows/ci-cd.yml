@@ -696,20 +696,58 @@ jobs:
           ssh -i ~/.ssh/aws_key -o StrictHostKeyChecking=no ec2-user@${EC2_IP} << 'DEPLOY_SCRIPT'
             set -e
             cd /home/ec2-user/app
+            
+            # Extrair e limpar
             tar -xzf deploy.tar.gz
             rm deploy.tar.gz
+            
             # Garantir que Docker está rodando
             sudo systemctl start docker || true
+            sudo systemctl enable docker || true
+            sleep 5
+            
+            # Parar containers existentes
             docker-compose -f docker-compose.prod.yml down || true
-            docker-compose -f docker-compose.prod.yml up -d --build
+            
+            # Build separado do up para evitar problemas com buildx
+            # Desabilitar buildx se não estiver disponível
+            export DOCKER_BUILDKIT=0
+            export COMPOSE_DOCKER_CLI_BUILD=0
+            
+            echo "🔨 Fazendo build da imagem..."
+            docker-compose -f docker-compose.prod.yml build --no-cache || {
+              echo "⚠️ Build com docker-compose falhou, tentando com docker build direto..."
+              docker build -t teddy-backend-api:latest -f Dockerfile .
+            }
+            
+            echo "🚀 Iniciando containers..."
+            docker-compose -f docker-compose.prod.yml up -d
+            
+            # Limpar imagens antigas
             docker image prune -f
-            # Verificar se container está rodando
-            sleep 10
-            docker ps
+            
+            # Aguardar container iniciar
+            echo "Aguardando container iniciar..."
+            sleep 15
+            
+            # Verificar status
+            echo "=== Status dos containers ==="
+            docker ps -a
             
             # Verificar logs
-            echo "=== Logs do container ==="
+            echo ""
+            echo "=== Logs do container (últimas 50 linhas) ==="
             docker logs --tail 50 teddy-backend-app || true
+            
+            # Verificar se porta está escutando
+            echo ""
+            echo "=== Verificando porta 3000 ==="
+            sudo netstat -tlnp | grep 3000 || sudo ss -tlnp | grep 3000 || echo "Porta 3000 não está em uso"
+            
+            # Teste local
+            echo ""
+            echo "=== Teste local ==="
+            curl -v http://localhost:3000/api-docs 2>&1 | head -10 || echo "Falha no teste local"
           DEPLOY_SCRIPT
           
           echo "✅ Deploy concluído! API disponível em: http://${EC2_IP}:3000"
