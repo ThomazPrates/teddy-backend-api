@@ -135,12 +135,28 @@ jobs:
           
           # Extrair apenas o IP (última linha que parece um IP)
           EC2_IP=$(echo "$TERRAFORM_OUTPUT_IP" | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -1)
-          RDS_ENDPOINT=$(echo "$TERRAFORM_OUTPUT_RDS" | grep -v "::debug::" | grep -v "Terraform exited" | grep -v "stdout:" | grep -v "stderr:" | grep -v "exitcode:" | grep -v "^\[" | tail -1 | tr -d '\n' | tr -d '\r' | xargs)
+          
+          # Extrair RDS endpoint (remover mensagens de debug)
+          RDS_ENDPOINT=$(echo "$TERRAFORM_OUTPUT_RDS" | grep -v "::debug::" | grep -v "Terraform exited" | grep -v "stdout:" | grep -v "stderr:" | grep -v "exitcode:" | grep -v "^\[" | grep -E '\.rds\.amazonaws\.com' | tail -1 | tr -d '\n' | tr -d '\r' | xargs)
           
           # Validar que obtivemos um IP válido
           if [[ -z "$EC2_IP" ]] || [[ ! "$EC2_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             echo "❌ ERRO: IP inválido obtido: '${EC2_IP}'"
             echo "Output completo: ${TERRAFORM_OUTPUT_IP}"
+            exit 1
+          fi
+          
+          # Validar RDS endpoint
+          if [[ -z "$RDS_ENDPOINT" ]]; then
+            echo "⚠️ AVISO: RDS endpoint não encontrado. Tentando obter novamente..."
+            # Tentar obter novamente sem filtros muito restritivos
+            RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/dev output rds_endpoint 2>&1 | grep -oE '[a-zA-Z0-9.-]+\.rds\.amazonaws\.com[^:]*' | head -1 | tr -d '\n' | tr -d '\r' | xargs)
+          fi
+          
+          if [[ -z "$RDS_ENDPOINT" ]]; then
+            echo "❌ ERRO: Não foi possível obter RDS endpoint"
+            echo "Output completo do terraform:"
+            terraform -chdir=./terraform/environments/dev output rds_endpoint
             exit 1
           fi
           
@@ -264,8 +280,22 @@ jobs:
           DATABASE_NAME: ${{ secrets.DATABASE_NAME || 'teddydb' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+          # Validar que RDS_ENDPOINT está definido
+          if [[ -z "${RDS_ENDPOINT}" ]]; then
+            echo "❌ ERRO: RDS_ENDPOINT não está definido"
+            exit 1
+          fi
+          
           # Extrair hostname do RDS (remover :5432 se presente)
           RDS_HOST=$(echo "${RDS_ENDPOINT}" | cut -d: -f1)
+          
+          # Validar que RDS_HOST foi extraído corretamente
+          if [[ -z "${RDS_HOST}" ]]; then
+            echo "❌ ERRO: Não foi possível extrair RDS_HOST de '${RDS_ENDPOINT}'"
+            exit 1
+          fi
+          
+          echo "📝 Criando .env no EC2 com DATABASE_HOST=${RDS_HOST}"
           
           # Criar .env no EC2
           ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "mkdir -p /home/ec2-user/app && cat > /home/ec2-user/app/.env << EOF
@@ -282,7 +312,14 @@ jobs:
           EOF"
           
           # Enviar código
-          tar --exclude='node_modules' --exclude='.git' --exclude='coverage' --exclude='dist' --exclude='.terraform' -czf deploy.tar.gz .
+          # Ignorar avisos de arquivos modificados durante a criação do tar
+          tar --exclude='node_modules' --exclude='.git' --exclude='coverage' --exclude='dist' --exclude='.terraform' --exclude='deploy.tar.gz' --warning=no-file-changed -czf deploy.tar.gz . || true
+          
+          # Verificar se o arquivo foi criado
+          if [ ! -f deploy.tar.gz ]; then
+            echo "❌ ERRO: Falha ao criar deploy.tar.gz"
+            exit 1
+          fi
           scp -i ~/.ssh/aws_key -o StrictHostKeyChecking=no deploy.tar.gz docker-compose.prod.yml ec2-user@${EC2_IP}:/home/ec2-user/app/
           
           # Deploy no EC2
@@ -425,12 +462,28 @@ jobs:
           
           # Extrair apenas o IP (última linha que parece um IP)
           EC2_IP=$(echo "$TERRAFORM_OUTPUT_IP" | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -1)
-          RDS_ENDPOINT=$(echo "$TERRAFORM_OUTPUT_RDS" | grep -v "::debug::" | grep -v "Terraform exited" | grep -v "stdout:" | grep -v "stderr:" | grep -v "exitcode:" | grep -v "^\[" | tail -1 | tr -d '\n' | tr -d '\r' | xargs)
+          
+          # Extrair RDS endpoint (remover mensagens de debug)
+          RDS_ENDPOINT=$(echo "$TERRAFORM_OUTPUT_RDS" | grep -v "::debug::" | grep -v "Terraform exited" | grep -v "stdout:" | grep -v "stderr:" | grep -v "exitcode:" | grep -v "^\[" | grep -E '\.rds\.amazonaws\.com' | tail -1 | tr -d '\n' | tr -d '\r' | xargs)
           
           # Validar que obtivemos um IP válido
           if [[ -z "$EC2_IP" ]] || [[ ! "$EC2_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             echo "❌ ERRO: IP inválido obtido: '${EC2_IP}'"
             echo "Output completo: ${TERRAFORM_OUTPUT_IP}"
+            exit 1
+          fi
+          
+          # Validar RDS endpoint
+          if [[ -z "$RDS_ENDPOINT" ]]; then
+            echo "⚠️ AVISO: RDS endpoint não encontrado. Tentando obter novamente..."
+            # Tentar obter novamente sem filtros muito restritivos
+            RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/prod output rds_endpoint 2>&1 | grep -oE '[a-zA-Z0-9.-]+\.rds\.amazonaws\.com[^:]*' | head -1 | tr -d '\n' | tr -d '\r' | xargs)
+          fi
+          
+          if [[ -z "$RDS_ENDPOINT" ]]; then
+            echo "❌ ERRO: Não foi possível obter RDS endpoint"
+            echo "Output completo do terraform:"
+            terraform -chdir=./terraform/environments/prod output rds_endpoint
             exit 1
           fi
           
@@ -554,8 +607,22 @@ jobs:
           DATABASE_NAME: ${{ secrets.DATABASE_NAME || 'teddydb' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+          # Validar que RDS_ENDPOINT está definido
+          if [[ -z "${RDS_ENDPOINT}" ]]; then
+            echo "❌ ERRO: RDS_ENDPOINT não está definido"
+            exit 1
+          fi
+          
           # Extrair hostname do RDS (remover :5432 se presente)
           RDS_HOST=$(echo "${RDS_ENDPOINT}" | cut -d: -f1)
+          
+          # Validar que RDS_HOST foi extraído corretamente
+          if [[ -z "${RDS_HOST}" ]]; then
+            echo "❌ ERRO: Não foi possível extrair RDS_HOST de '${RDS_ENDPOINT}'"
+            exit 1
+          fi
+          
+          echo "📝 Criando .env no EC2 com DATABASE_HOST=${RDS_HOST}"
           
           # Criar .env no EC2
           ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "mkdir -p /home/ec2-user/app && cat > /home/ec2-user/app/.env << EOF
@@ -572,7 +639,14 @@ jobs:
           EOF"
           
           # Enviar código
-          tar --exclude='node_modules' --exclude='.git' --exclude='coverage' --exclude='dist' --exclude='.terraform' -czf deploy.tar.gz .
+          # Ignorar avisos de arquivos modificados durante a criação do tar
+          tar --exclude='node_modules' --exclude='.git' --exclude='coverage' --exclude='dist' --exclude='.terraform' --exclude='deploy.tar.gz' --warning=no-file-changed -czf deploy.tar.gz . || true
+          
+          # Verificar se o arquivo foi criado
+          if [ ! -f deploy.tar.gz ]; then
+            echo "❌ ERRO: Falha ao criar deploy.tar.gz"
+            exit 1
+          fi
           scp -i ~/.ssh/aws_key -o StrictHostKeyChecking=no deploy.tar.gz docker-compose.prod.yml ec2-user@${EC2_IP}:/home/ec2-user/app/
           
           # Deploy no EC2
