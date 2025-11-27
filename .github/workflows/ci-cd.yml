@@ -129,25 +129,147 @@ jobs:
       - name: Get EC2 IP and RDS Endpoint
         id: terraform_output
         run: |
-          EC2_IP=$(terraform -chdir=./terraform/environments/dev output -raw -no-color ec2_public_ip 2>/dev/null | tr -d '\n')
-          RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/dev output -raw -no-color rds_endpoint 2>/dev/null | tr -d '\n')
+          # Capturar output do terraform e limpar mensagens de debug
+          TERRAFORM_OUTPUT_IP=$(terraform -chdir=./terraform/environments/dev output -raw -no-color ec2_public_ip 2>&1)
+          TERRAFORM_OUTPUT_RDS=$(terraform -chdir=./terraform/environments/dev output -raw -no-color rds_endpoint 2>&1)
+          
+          # Extrair apenas o IP (última linha que parece um IP)
+          EC2_IP=$(echo "$TERRAFORM_OUTPUT_IP" | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -1)
+          
+          # Extrair RDS endpoint (remover mensagens de debug)
+          RDS_ENDPOINT=$(echo "$TERRAFORM_OUTPUT_RDS" | grep -v "::debug::" | grep -v "Terraform exited" | grep -v "stdout:" | grep -v "stderr:" | grep -v "exitcode:" | grep -v "^\[" | grep -E '\.rds\.amazonaws\.com' | tail -1 | tr -d '\n' | tr -d '\r' | xargs)
+          
+          # Validar que obtivemos um IP válido
+          if [[ -z "$EC2_IP" ]] || [[ ! "$EC2_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "❌ ERRO: IP inválido obtido: '${EC2_IP}'"
+            echo "Output completo: ${TERRAFORM_OUTPUT_IP}"
+            exit 1
+          fi
+          
+          # Validar RDS endpoint
+          if [[ -z "$RDS_ENDPOINT" ]]; then
+            echo "⚠️ AVISO: RDS endpoint não encontrado. Tentando obter novamente..."
+            # Tentar obter novamente sem filtros muito restritivos
+            RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/dev output rds_endpoint 2>&1 | grep -oE '[a-zA-Z0-9.-]+\.rds\.amazonaws\.com[^:]*' | head -1 | tr -d '\n' | tr -d '\r' | xargs)
+          fi
+          
+          if [[ -z "$RDS_ENDPOINT" ]]; then
+            echo "❌ ERRO: Não foi possível obter RDS endpoint"
+            echo "Output completo do terraform:"
+            terraform -chdir=./terraform/environments/dev output rds_endpoint
+            exit 1
+          fi
+          
           echo "ec2_ip=${EC2_IP}" >> $GITHUB_OUTPUT
           echo "rds_endpoint=${RDS_ENDPOINT}" >> $GITHUB_OUTPUT
+          echo "✅ EC2 IP: ${EC2_IP}"
+          echo "✅ RDS Endpoint: ${RDS_ENDPOINT}"
 
       - name: Setup SSH
         run: |
-          # A chave privada já foi gerada no step "Generate SSH Key Pair"
-          ssh-keyscan -H ${{ steps.terraform_output.outputs.ec2_ip }} >> ~/.ssh/known_hosts
-          # Aguardar EC2 estar pronta para SSH (pode levar alguns segundos após criação)
-          echo "Aguardando EC2 estar pronta para SSH..."
-          for i in {1..30}; do
-            if ssh -i ~/.ssh/aws_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@${{ steps.terraform_output.outputs.ec2_ip }} "echo 'EC2 pronta!'" 2>/dev/null; then
-              echo "EC2 está pronta!"
-              break
+          EC2_IP="${{ steps.terraform_output.outputs.ec2_ip }}"
+          ENVIRONMENT="${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}"
+          GITHUB_IP=$(curl -s https://checkip.amazonaws.com)
+          
+          echo "EC2 IP: ${EC2_IP}"
+          echo "Environment: ${ENVIRONMENT}"
+          echo "GitHub Actions IP: ${GITHUB_IP}"
+          
+          # Obter Instance ID via AWS CLI
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=ip-address,Values=${EC2_IP}" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "⚠️ Não foi possível obter Instance ID por IP, tentando buscar por tag..."
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=${{ secrets.PROJECT_NAME }}-${ENVIRONMENT}-app-server" "Name=instance-state-name,Values=running,pending" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text 2>/dev/null || echo "")
+          fi
+          
+          echo "Instance ID: ${INSTANCE_ID}"
+          
+          # Verificar e atualizar Security Group se necessário
+          if [ -n "$INSTANCE_ID" ]; then
+            SG_ID=$(aws ec2 describe-instances \
+              --instance-ids ${INSTANCE_ID} \
+              --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$SG_ID" ]; then
+              echo "Security Group ID: ${SG_ID}"
+              echo "Verificando se IP ${GITHUB_IP} está permitido no Security Group..."
+              
+              # Verificar se regra SSH para este IP já existe
+              HAS_RULE=$(aws ec2 describe-security-groups \
+                --group-ids ${SG_ID} \
+                --query "SecurityGroups[0].IpPermissions[?FromPort==\`22\` && IpRanges[?CidrIp==\`${GITHUB_IP}/32\`]]" \
+                --output text 2>/dev/null || echo "")
+              
+              if [ -z "$HAS_RULE" ]; then
+                echo "⚠️ IP ${GITHUB_IP} não está no Security Group. Adicionando..."
+                aws ec2 authorize-security-group-ingress \
+                  --group-id ${SG_ID} \
+                  --protocol tcp \
+                  --port 22 \
+                  --cidr ${GITHUB_IP}/32 \
+                  || echo "⚠️ Erro ao adicionar regra (pode já existir)"
+                echo "Aguardando 5 segundos para regra ser aplicada..."
+                sleep 5
+              else
+                echo "✅ IP ${GITHUB_IP} já está permitido no Security Group"
+              fi
             fi
-            echo "Tentativa $i/30 - aguardando..."
-            sleep 10
+            
+            # Aguardar instância estar em estado "running" e status checks passarem
+            echo "Aguardando instância estar pronta (status checks)..."
+            timeout 600 aws ec2 wait instance-status-ok --instance-ids ${INSTANCE_ID} || echo "⚠️ Timeout aguardando status checks, continuando..."
+          fi
+          
+          # Adicionar host key
+          ssh-keyscan -H ${EC2_IP} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          # Aguardar SSH estar disponível (com timeout máximo de 5 minutos)
+          echo "Aguardando SSH estar disponível..."
+          MAX_ATTEMPTS=30
+          ATTEMPT=0
+          SSH_READY=false
+          
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Tentativa $ATTEMPT/$MAX_ATTEMPTS..."
+            
+            # Tentar conectar com timeout curto
+            if ssh -i ~/.ssh/aws_key \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              ec2-user@${EC2_IP} "echo 'SSH OK'" 2>&1; then
+              echo "✅ SSH está disponível!"
+              SSH_READY=true
+              break
+            else
+              SSH_ERROR=$?
+              echo "SSH ainda não disponível (código: $SSH_ERROR). Aguardando 10 segundos..."
+              sleep 10
+            fi
           done
+          
+          if [ "$SSH_READY" = false ]; then
+            echo "❌ ERRO: Não foi possível conectar via SSH após $MAX_ATTEMPTS tentativas"
+            echo "Verificando status da instância..."
+            if [ -n "$INSTANCE_ID" ]; then
+              aws ec2 describe-instance-status --instance-ids ${INSTANCE_ID} || true
+            fi
+            echo "Verificando Security Group..."
+            if [ -n "$SG_ID" ]; then
+              aws ec2 describe-security-groups --group-ids ${SG_ID} --query 'SecurityGroups[0].IpPermissions[?FromPort==`22`]' || true
+            fi
+            exit 1
+          fi
 
       - name: Deploy to EC2
         env:
@@ -158,12 +280,29 @@ jobs:
           DATABASE_NAME: ${{ secrets.DATABASE_NAME || 'teddydb' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+          # Validar que RDS_ENDPOINT está definido
+          if [[ -z "${RDS_ENDPOINT}" ]]; then
+            echo "❌ ERRO: RDS_ENDPOINT não está definido"
+            exit 1
+          fi
+          
+          # Extrair hostname do RDS (remover :5432 se presente)
+          RDS_HOST=$(echo "${RDS_ENDPOINT}" | cut -d: -f1)
+          
+          # Validar que RDS_HOST foi extraído corretamente
+          if [[ -z "${RDS_HOST}" ]]; then
+            echo "❌ ERRO: Não foi possível extrair RDS_HOST de '${RDS_ENDPOINT}'"
+            exit 1
+          fi
+          
+          echo "📝 Criando .env no EC2 com DATABASE_HOST=${RDS_HOST}"
+          
           # Criar .env no EC2
           ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "mkdir -p /home/ec2-user/app && cat > /home/ec2-user/app/.env << EOF
           NODE_ENV=production
           PORT=3000
           BASE_URL=http://${EC2_IP}:3000
-          DATABASE_HOST=${RDS_ENDPOINT}
+          DATABASE_HOST=${RDS_HOST}
           DATABASE_PORT=5432
           DATABASE_USER=${DATABASE_USER}
           DATABASE_PASSWORD=${DATABASE_PASSWORD}
@@ -173,23 +312,72 @@ jobs:
           EOF"
           
           # Enviar código
-          tar --exclude='node_modules' --exclude='.git' --exclude='coverage' --exclude='dist' --exclude='.terraform' -czf deploy.tar.gz .
+          # Ignorar avisos de arquivos modificados durante a criação do tar
+          tar --exclude='node_modules' --exclude='.git' --exclude='coverage' --exclude='dist' --exclude='.terraform' --exclude='deploy.tar.gz' --warning=no-file-changed -czf deploy.tar.gz . || true
+          
+          # Verificar se o arquivo foi criado
+          if [ ! -f deploy.tar.gz ]; then
+            echo "❌ ERRO: Falha ao criar deploy.tar.gz"
+            exit 1
+          fi
           scp -i ~/.ssh/aws_key -o StrictHostKeyChecking=no deploy.tar.gz docker-compose.prod.yml ec2-user@${EC2_IP}:/home/ec2-user/app/
           
           # Deploy no EC2
           ssh -i ~/.ssh/aws_key -o StrictHostKeyChecking=no ec2-user@${EC2_IP} << 'DEPLOY_SCRIPT'
             set -e
             cd /home/ec2-user/app
+            
+            # Extrair e limpar
             tar -xzf deploy.tar.gz
             rm deploy.tar.gz
+            
             # Garantir que Docker está rodando
             sudo systemctl start docker || true
+            sudo systemctl enable docker || true
+            sleep 5
+            
+            # Parar containers existentes
             docker-compose -f docker-compose.prod.yml down || true
-            docker-compose -f docker-compose.prod.yml up -d --build
+            
+            # Build separado do up para evitar problemas com buildx
+            # Desabilitar buildx se não estiver disponível
+            export DOCKER_BUILDKIT=0
+            export COMPOSE_DOCKER_CLI_BUILD=0
+            
+            echo "🔨 Fazendo build da imagem..."
+            docker-compose -f docker-compose.prod.yml build --no-cache || {
+              echo "⚠️ Build com docker-compose falhou, tentando com docker build direto..."
+              docker build -t teddy-backend-api:latest -f Dockerfile .
+            }
+            
+            echo "🚀 Iniciando containers..."
+            docker-compose -f docker-compose.prod.yml up -d
+            
+            # Limpar imagens antigas
             docker image prune -f
-            # Verificar se container está rodando
-            sleep 10
-            docker ps
+            
+            # Aguardar container iniciar
+            echo "Aguardando container iniciar..."
+            sleep 15
+            
+            # Verificar status
+            echo "=== Status dos containers ==="
+            docker ps -a
+            
+            # Verificar logs
+            echo ""
+            echo "=== Logs do container (últimas 50 linhas) ==="
+            docker logs --tail 50 teddy-backend-app || true
+            
+            # Verificar se porta está escutando
+            echo ""
+            echo "=== Verificando porta 3000 ==="
+            sudo netstat -tlnp | grep 3000 || sudo ss -tlnp | grep 3000 || echo "Porta 3000 não está em uso"
+            
+            # Teste local
+            echo ""
+            echo "=== Teste local ==="
+            curl -v http://localhost:3000/api-docs 2>&1 | head -10 || echo "Falha no teste local"
           DEPLOY_SCRIPT
           
           echo "✅ Deploy concluído! API disponível em: http://${EC2_IP}:3000"
@@ -279,25 +467,147 @@ jobs:
       - name: Get EC2 IP and RDS Endpoint
         id: terraform_output
         run: |
-          EC2_IP=$(terraform -chdir=./terraform/environments/prod output -raw -no-color ec2_public_ip 2>/dev/null | tr -d '\n')
-          RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/prod output -raw -no-color rds_endpoint 2>/dev/null | tr -d '\n')
+          # Capturar output do terraform e limpar mensagens de debug
+          TERRAFORM_OUTPUT_IP=$(terraform -chdir=./terraform/environments/prod output -raw -no-color ec2_public_ip 2>&1)
+          TERRAFORM_OUTPUT_RDS=$(terraform -chdir=./terraform/environments/prod output -raw -no-color rds_endpoint 2>&1)
+          
+          # Extrair apenas o IP (última linha que parece um IP)
+          EC2_IP=$(echo "$TERRAFORM_OUTPUT_IP" | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -1)
+          
+          # Extrair RDS endpoint (remover mensagens de debug)
+          RDS_ENDPOINT=$(echo "$TERRAFORM_OUTPUT_RDS" | grep -v "::debug::" | grep -v "Terraform exited" | grep -v "stdout:" | grep -v "stderr:" | grep -v "exitcode:" | grep -v "^\[" | grep -E '\.rds\.amazonaws\.com' | tail -1 | tr -d '\n' | tr -d '\r' | xargs)
+          
+          # Validar que obtivemos um IP válido
+          if [[ -z "$EC2_IP" ]] || [[ ! "$EC2_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "❌ ERRO: IP inválido obtido: '${EC2_IP}'"
+            echo "Output completo: ${TERRAFORM_OUTPUT_IP}"
+            exit 1
+          fi
+          
+          # Validar RDS endpoint
+          if [[ -z "$RDS_ENDPOINT" ]]; then
+            echo "⚠️ AVISO: RDS endpoint não encontrado. Tentando obter novamente..."
+            # Tentar obter novamente sem filtros muito restritivos
+            RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/prod output rds_endpoint 2>&1 | grep -oE '[a-zA-Z0-9.-]+\.rds\.amazonaws\.com[^:]*' | head -1 | tr -d '\n' | tr -d '\r' | xargs)
+          fi
+          
+          if [[ -z "$RDS_ENDPOINT" ]]; then
+            echo "❌ ERRO: Não foi possível obter RDS endpoint"
+            echo "Output completo do terraform:"
+            terraform -chdir=./terraform/environments/prod output rds_endpoint
+            exit 1
+          fi
+          
           echo "ec2_ip=${EC2_IP}" >> $GITHUB_OUTPUT
           echo "rds_endpoint=${RDS_ENDPOINT}" >> $GITHUB_OUTPUT
+          echo "✅ EC2 IP: ${EC2_IP}"
+          echo "✅ RDS Endpoint: ${RDS_ENDPOINT}"
 
       - name: Setup SSH
         run: |
-          # A chave privada já foi gerada no step "Generate SSH Key Pair"
-          ssh-keyscan -H ${{ steps.terraform_output.outputs.ec2_ip }} >> ~/.ssh/known_hosts
-          # Aguardar EC2 estar pronta para SSH (pode levar alguns segundos após criação)
-          echo "Aguardando EC2 estar pronta para SSH..."
-          for i in {1..30}; do
-            if ssh -i ~/.ssh/aws_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@${{ steps.terraform_output.outputs.ec2_ip }} "echo 'EC2 pronta!'" 2>/dev/null; then
-              echo "EC2 está pronta!"
-              break
+          EC2_IP="${{ steps.terraform_output.outputs.ec2_ip }}"
+          ENVIRONMENT="${{ github.ref == 'refs/heads/main' && 'prod' || 'dev' }}"
+          GITHUB_IP=$(curl -s https://checkip.amazonaws.com)
+          
+          echo "EC2 IP: ${EC2_IP}"
+          echo "Environment: ${ENVIRONMENT}"
+          echo "GitHub Actions IP: ${GITHUB_IP}"
+          
+          # Obter Instance ID via AWS CLI
+          INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=ip-address,Values=${EC2_IP}" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[0].Instances[0].InstanceId' \
+            --output text 2>/dev/null || echo "")
+          
+          if [ -z "$INSTANCE_ID" ]; then
+            echo "⚠️ Não foi possível obter Instance ID por IP, tentando buscar por tag..."
+            INSTANCE_ID=$(aws ec2 describe-instances \
+              --filters "Name=tag:Name,Values=${{ secrets.PROJECT_NAME }}-${ENVIRONMENT}-app-server" "Name=instance-state-name,Values=running,pending" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text 2>/dev/null || echo "")
+          fi
+          
+          echo "Instance ID: ${INSTANCE_ID}"
+          
+          # Verificar e atualizar Security Group se necessário
+          if [ -n "$INSTANCE_ID" ]; then
+            SG_ID=$(aws ec2 describe-instances \
+              --instance-ids ${INSTANCE_ID} \
+              --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$SG_ID" ]; then
+              echo "Security Group ID: ${SG_ID}"
+              echo "Verificando se IP ${GITHUB_IP} está permitido no Security Group..."
+              
+              # Verificar se regra SSH para este IP já existe
+              HAS_RULE=$(aws ec2 describe-security-groups \
+                --group-ids ${SG_ID} \
+                --query "SecurityGroups[0].IpPermissions[?FromPort==\`22\` && IpRanges[?CidrIp==\`${GITHUB_IP}/32\`]]" \
+                --output text 2>/dev/null || echo "")
+              
+              if [ -z "$HAS_RULE" ]; then
+                echo "⚠️ IP ${GITHUB_IP} não está no Security Group. Adicionando..."
+                aws ec2 authorize-security-group-ingress \
+                  --group-id ${SG_ID} \
+                  --protocol tcp \
+                  --port 22 \
+                  --cidr ${GITHUB_IP}/32 \
+                  || echo "⚠️ Erro ao adicionar regra (pode já existir)"
+                echo "Aguardando 5 segundos para regra ser aplicada..."
+                sleep 5
+              else
+                echo "✅ IP ${GITHUB_IP} já está permitido no Security Group"
+              fi
             fi
-            echo "Tentativa $i/30 - aguardando..."
-            sleep 10
+            
+            # Aguardar instância estar em estado "running" e status checks passarem
+            echo "Aguardando instância estar pronta (status checks)..."
+            timeout 600 aws ec2 wait instance-status-ok --instance-ids ${INSTANCE_ID} || echo "⚠️ Timeout aguardando status checks, continuando..."
+          fi
+          
+          # Adicionar host key
+          ssh-keyscan -H ${EC2_IP} >> ~/.ssh/known_hosts 2>/dev/null || true
+          
+          # Aguardar SSH estar disponível (com timeout máximo de 5 minutos)
+          echo "Aguardando SSH estar disponível..."
+          MAX_ATTEMPTS=30
+          ATTEMPT=0
+          SSH_READY=false
+          
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Tentativa $ATTEMPT/$MAX_ATTEMPTS..."
+            
+            # Tentar conectar com timeout curto
+            if ssh -i ~/.ssh/aws_key \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              ec2-user@${EC2_IP} "echo 'SSH OK'" 2>&1; then
+              echo "✅ SSH está disponível!"
+              SSH_READY=true
+              break
+            else
+              SSH_ERROR=$?
+              echo "SSH ainda não disponível (código: $SSH_ERROR). Aguardando 10 segundos..."
+              sleep 10
+            fi
           done
+          
+          if [ "$SSH_READY" = false ]; then
+            echo "❌ ERRO: Não foi possível conectar via SSH após $MAX_ATTEMPTS tentativas"
+            echo "Verificando status da instância..."
+            if [ -n "$INSTANCE_ID" ]; then
+              aws ec2 describe-instance-status --instance-ids ${INSTANCE_ID} || true
+            fi
+            echo "Verificando Security Group..."
+            if [ -n "$SG_ID" ]; then
+              aws ec2 describe-security-groups --group-ids ${SG_ID} --query 'SecurityGroups[0].IpPermissions[?FromPort==`22`]' || true
+            fi
+            exit 1
+          fi
 
       - name: Deploy to EC2
         env:
@@ -308,12 +618,29 @@ jobs:
           DATABASE_NAME: ${{ secrets.DATABASE_NAME || 'teddydb' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+          # Validar que RDS_ENDPOINT está definido
+          if [[ -z "${RDS_ENDPOINT}" ]]; then
+            echo "❌ ERRO: RDS_ENDPOINT não está definido"
+            exit 1
+          fi
+          
+          # Extrair hostname do RDS (remover :5432 se presente)
+          RDS_HOST=$(echo "${RDS_ENDPOINT}" | cut -d: -f1)
+          
+          # Validar que RDS_HOST foi extraído corretamente
+          if [[ -z "${RDS_HOST}" ]]; then
+            echo "❌ ERRO: Não foi possível extrair RDS_HOST de '${RDS_ENDPOINT}'"
+            exit 1
+          fi
+          
+          echo "📝 Criando .env no EC2 com DATABASE_HOST=${RDS_HOST}"
+          
           # Criar .env no EC2
           ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "mkdir -p /home/ec2-user/app && cat > /home/ec2-user/app/.env << EOF
           NODE_ENV=production
           PORT=3000
           BASE_URL=http://${EC2_IP}:3000
-          DATABASE_HOST=${RDS_ENDPOINT}
+          DATABASE_HOST=${RDS_HOST}
           DATABASE_PORT=5432
           DATABASE_USER=${DATABASE_USER}
           DATABASE_PASSWORD=${DATABASE_PASSWORD}
@@ -323,7 +650,14 @@ jobs:
           EOF"
           
           # Enviar código
-          tar --exclude='node_modules' --exclude='.git' --exclude='coverage' --exclude='dist' --exclude='.terraform' -czf deploy.tar.gz .
+          # Ignorar avisos de arquivos modificados durante a criação do tar
+          tar --exclude='node_modules' --exclude='.git' --exclude='coverage' --exclude='dist' --exclude='.terraform' --exclude='deploy.tar.gz' --warning=no-file-changed -czf deploy.tar.gz . || true
+          
+          # Verificar se o arquivo foi criado
+          if [ ! -f deploy.tar.gz ]; then
+            echo "❌ ERRO: Falha ao criar deploy.tar.gz"
+            exit 1
+          fi
           scp -i ~/.ssh/aws_key -o StrictHostKeyChecking=no deploy.tar.gz docker-compose.prod.yml ec2-user@${EC2_IP}:/home/ec2-user/app/
           
           # Deploy no EC2
@@ -340,6 +674,10 @@ jobs:
             # Verificar se container está rodando
             sleep 10
             docker ps
+            
+            # Verificar logs
+            echo "=== Logs do container ==="
+            docker logs --tail 50 teddy-backend-app || true
           DEPLOY_SCRIPT
           
           echo "✅ Deploy concluído! API disponível em: http://${EC2_IP}:3000"

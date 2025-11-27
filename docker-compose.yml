@@ -34,6 +34,8 @@ services:
       DATABASE_USER: ${DATABASE_USER:-postgres}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-postgres}
       DATABASE_NAME: ${DATABASE_NAME:-teddydb}
+      JWT_SECRET: ${JWT_SECRET:-default-secret-key-for-development}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
     ports:
       - "3000:3000"
     volumes:

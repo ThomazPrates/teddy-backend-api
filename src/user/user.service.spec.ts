@@ -95,7 +95,7 @@ describe('UserService', () => {
       });
       expect(authService.signIn).toHaveBeenCalledWith(
         savedUser.email,
-        hashedPassword,
+        createUserDto.password,
       );
     });
 
@@ -154,7 +154,7 @@ describe('UserService', () => {
       expect(bcrypt.hash).toHaveBeenCalledTimes(1);
     });
 
-    it('should sign in user with hashed password after creation', async () => {
+    it('should sign in user with original password after creation', async () => {
       const createUserDto: CreateUserRequestDto = {
         email: 'signin@example.com',
         password: 'Password123!',
@@ -178,7 +178,7 @@ describe('UserService', () => {
 
       expect(authService.signIn).toHaveBeenCalledWith(
         'signin@example.com',
-        hashedPassword,
+        createUserDto.password, // Senha original, não hasheada
       );
       expect(authService.signIn).toHaveBeenCalledTimes(1);
     });

@@ -18,10 +18,19 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException();
     }
     try {
-      const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_SECRET,
-      });
-      request['user'] = payload;
+      const payload = await this.jwtService.verifyAsync(token);
+      
+      const userId = payload.sub || payload.userId;
+      
+      if (!userId) {
+        throw new UnauthorizedException('Token inválido: userId não encontrado');
+      }
+      
+      request['user'] = {
+        userId: userId,
+        email: payload.email,
+        ...payload,
+      };
     } catch {
       throw new UnauthorizedException();
     }

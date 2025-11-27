@@ -32,7 +32,7 @@ export class UserService {
 
     const authResult = await this.authService.signIn(
       savedUser.email,
-      hashedPassword,
+      createUserDto.password,
     );
 
     return {
