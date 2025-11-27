@@ -2,6 +2,20 @@
 
 API REST para encurtamento de URLs desenvolvida com NestJS, permitindo que usuários criem links curtos e personalizados, gerenciem suas URLs e façam redirecionamentos.
 
+## 🚀 URLs de Deploy
+
+> **⚠️ IMPORTANTE**: As URLs abaixo são dos ambientes de deploy automático via CI/CD.
+
+### 🌍 Ambiente de Desenvolvimento (DEV)
+**URL**: [http://98.91.251.41:3000/](http://98.91.251.41:3000/)  
+**Documentação Swagger**: [http://98.91.251.41:3000/api-docs](http://98.91.251.41:3000/api-docs)
+
+### 🏭 Ambiente de Produção (PROD)
+**URL**: [http://000.000.000.000:3000/](http://000.000.000.000:3000/)  
+**Documentação Swagger**: [http://000.000.000.000:3000/api-docs](http://000.000.000.000:3000/api-docs)
+
+---
+
 ## 📋 Índice
 
 - [Sobre o Projeto](#sobre-o-projeto)
