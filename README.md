@@ -568,6 +568,64 @@ curl -X POST http://<EC2_IP>:3000/shorten \
 - **RDS**: Criar réplicas de leitura para distribuir carga de leitura
 - **Load Balancer**: Usar ELB/ALB para distribuir requisições entre instâncias
 
+### 🚀 Futuras Melhorias
+
+#### Cache com Redis
+- **Objetivo**: Reduzir carga no banco de dados e melhorar performance de leitura
+- **Implementação**: 
+  - Integrar **AWS ElastiCache (Redis)** para cache de URLs encurtadas
+  - Cachear respostas frequentes (URLs mais acessadas)
+  - Reduzir latência em operações de leitura
+  - Implementar estratégias de invalidação de cache
+- **Benefícios**: 
+  - Redução significativa de requisições ao RDS
+  - Melhoria na latência de resposta (< 10ms para cache hits)
+  - Maior capacidade de requisições por segundo
+
+#### Monitoramento e Alarmes
+- **Objetivo**: Visibilidade completa da saúde da aplicação e infraestrutura
+- **Implementação**:
+  - **CloudWatch Metrics**: Monitorar CPU, memória, latência, taxa de erro
+  - **CloudWatch Logs**: Centralizar logs da aplicação
+  - **CloudWatch Alarms**: Alertas automáticos para:
+    - Alta utilização de CPU/memória (> 80%)
+    - Taxa de erro elevada (> 5%)
+    - Latência alta (> 1s)
+    - Disponibilidade do banco de dados
+  - **AWS X-Ray**: Rastreamento distribuído de requisições
+  - **Health Checks**: Endpoints de saúde para monitoramento proativo
+- **Benefícios**:
+  - Detecção proativa de problemas
+  - Notificações automáticas via SNS/Email/Slack
+  - Métricas históricas para análise de tendências
+  - Debugging mais eficiente com traces distribuídos
+
+#### Escalabilidade com Kubernetes (EKS)
+- **Objetivo**: Escalabilidade automática e alta disponibilidade em nível empresarial
+- **Implementação**:
+  - **Amazon EKS**: Cluster Kubernetes gerenciado na AWS
+  - **Horizontal Pod Autoscaling (HPA)**: Escalar pods automaticamente baseado em CPU/memória/requisições
+  - **Cluster Autoscaling**: Adicionar/remover nodes automaticamente
+  - **Service Mesh (Istio/Linkerd)**: Gerenciamento avançado de tráfego e segurança
+  - **Ingress Controller**: Gerenciamento de rotas e SSL/TLS
+  - **ConfigMaps e Secrets**: Gerenciamento centralizado de configurações
+  - **Deployments**: Rolling updates sem downtime
+- **Benefícios**:
+  - **Auto Scaling**: Escala de 0 a N pods automaticamente
+  - **Alta Disponibilidade**: Distribuição em múltiplas zonas de disponibilidade
+  - **Zero Downtime**: Rolling updates e health checks automáticos
+  - **Resource Efficiency**: Otimização de recursos com bin packing
+  - **Multi-Region**: Possibilidade de deploy em múltiplas regiões
+  - **Service Discovery**: Descoberta automática de serviços
+- **Arquitetura Proposta**:
+  ```
+  Internet → ALB → EKS Ingress → Kubernetes Services → Pods (NestJS)
+                                                         ↓
+                                                    ElastiCache (Redis)
+                                                         ↓
+                                                    RDS (PostgreSQL)
+  ```
+
 ### Desafios e Soluções  
 - **Sincronização de dados**: Réplicas RDS são somente leitura; escritas vão para instância principal
 - **Gerenciamento de estado**: Usar balanceadores de carga (ELB/ALB) para múltiplas instâncias
