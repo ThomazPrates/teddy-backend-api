@@ -556,39 +556,6 @@ curl -X POST http://<EC2_IP>:3000/shorten \
 
 > **Importante**: A `BASE_URL` é configurada automaticamente no deploy para usar o IP do EC2: `http://<EC2_IP>:3000`. Se você tiver um domínio, adicione o secret `BASE_URL=https://api.seudominio.com` no GitHub.
 
-## 📁 Estrutura do Projeto
-
-```
-teddy-backend-api/
-├── src/
-│   ├── auth/              # Módulo de autenticação
-│   │   ├── guards/        # Guards de autenticação
-│   │   └── dto/           # Data Transfer Objects
-│   ├── user/              # Módulo de usuários
-│   │   ├── entities/      # Entidades TypeORM
-│   │   └── dto/           # DTOs
-│   ├── shorten/           # Módulo de encurtamento
-│   │   ├── entities/      # Entidades
-│   │   └── dto/           # DTOs
-│   ├── redirect/          # Módulo de redirecionamento
-│   ├── database/          # Configuração do banco
-│   ├── shared/            # Código compartilhado
-│   ├── app.module.ts      # Módulo principal
-│   └── main.ts            # Entry point
-├── terraform/
-│   └── environments/
-│       ├── dev/           # Configuração Terraform dev
-│       └── prod/          # Configuração Terraform prod
-├── .github/
-│   └── workflows/
-│       └── ci-cd.yml      # Pipeline CI/CD
-├── docker-compose.yml     # Configuração Docker Compose
-├── Dockerfile             # Dockerfile produção
-├── Dockerfile.dev         # Dockerfile desenvolvimento
-├── package.json
-└── README.md
-```
-
 ## 📈 Escalabilidade
 
 ### Escala Vertical  
