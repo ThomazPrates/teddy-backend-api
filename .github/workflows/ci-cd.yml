@@ -129,8 +129,32 @@ jobs:
       - name: Get EC2 IP and RDS Endpoint
         id: terraform_output
         run: |
+<<<<<<< Updated upstream
           EC2_IP=$(terraform -chdir=./terraform/environments/dev output -raw -no-color ec2_public_ip 2>/dev/null | tr -d '\n')
           RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/dev output -raw -no-color rds_endpoint 2>/dev/null | tr -d '\n')
+=======
+<<<<<<< HEAD
+<<<<<<< Updated upstream
+          docker stop ${{ env.DOCKER_IMAGE_NAME }}-${{ matrix.environment }} || true
+          docker rm ${{ env.DOCKER_IMAGE_NAME }}-${{ matrix.environment }} || true
+          docker run -d --name ${{ env.DOCKER_IMAGE_NAME }}-${{ matrix.environment }} -p ${{ matrix.environment == 'dev' && '3001:3000' || '3000:3000' }} ${{ env.DOCKER_IMAGE_NAME }}:${{ matrix.environment }}
+=======
+          # Capturar output do terraform e limpar mensagens de debug
+          TERRAFORM_OUTPUT_IP=$(terraform -chdir=./terraform/environments/dev output -raw -no-color ec2_public_ip 2>&1)
+          TERRAFORM_OUTPUT_RDS=$(terraform -chdir=./terraform/environments/dev output -raw -no-color rds_endpoint 2>&1)
+          
+          # Extrair apenas o IP (última linha que parece um IP)
+          EC2_IP=$(echo "$TERRAFORM_OUTPUT_IP" | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -1)
+          RDS_ENDPOINT=$(echo "$TERRAFORM_OUTPUT_RDS" | grep -v "::debug::" | grep -v "Terraform exited" | grep -v "stdout:" | grep -v "stderr:" | grep -v "exitcode:" | grep -v "^\[" | tail -1 | tr -d '\n' | tr -d '\r' | xargs)
+          
+          # Validar que obtivemos um IP válido
+          if [[ -z "$EC2_IP" ]] || [[ ! "$EC2_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "❌ ERRO: IP inválido obtido: '${EC2_IP}'"
+            echo "Output completo: ${TERRAFORM_OUTPUT_IP}"
+            exit 1
+          fi
+          
+>>>>>>> Stashed changes
           echo "ec2_ip=${EC2_IP}" >> $GITHUB_OUTPUT
           echo "rds_endpoint=${RDS_ENDPOINT}" >> $GITHUB_OUTPUT
 
@@ -239,6 +263,27 @@ jobs:
             fi
             exit 1
           fi
+=======
+          EC2_IP=$(terraform -chdir=./terraform/environments/dev output -raw -no-color ec2_public_ip 2>/dev/null | tr -d '\n')
+          RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/dev output -raw -no-color rds_endpoint 2>/dev/null | tr -d '\n')
+          echo "ec2_ip=${EC2_IP}" >> $GITHUB_OUTPUT
+          echo "rds_endpoint=${RDS_ENDPOINT}" >> $GITHUB_OUTPUT
+
+      - name: Setup SSH
+        run: |
+          # A chave privada já foi gerada no step "Generate SSH Key Pair"
+          ssh-keyscan -H ${{ steps.terraform_output.outputs.ec2_ip }} >> ~/.ssh/known_hosts
+          # Aguardar EC2 estar pronta para SSH (pode levar alguns segundos após criação)
+          echo "Aguardando EC2 estar pronta para SSH..."
+          for i in {1..30}; do
+            if ssh -i ~/.ssh/aws_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@${{ steps.terraform_output.outputs.ec2_ip }} "echo 'EC2 pronta!'" 2>/dev/null; then
+              echo "EC2 está pronta!"
+              break
+            fi
+            echo "Tentativa $i/30 - aguardando..."
+            sleep 10
+          done
+>>>>>>> b9db48a99306daf21ea133c9e59e5a5c4911d5df
 
       - name: Deploy to EC2
         env:
@@ -249,14 +294,21 @@ jobs:
           DATABASE_NAME: ${{ secrets.DATABASE_NAME || 'teddydb' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+<<<<<<< HEAD
           RDS_HOST=$(echo "${RDS_ENDPOINT}" | cut -d: -f1)
           
+=======
+>>>>>>> b9db48a99306daf21ea133c9e59e5a5c4911d5df
           # Criar .env no EC2
           ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "mkdir -p /home/ec2-user/app && cat > /home/ec2-user/app/.env << EOF
           NODE_ENV=production
           PORT=3000
           BASE_URL=http://${EC2_IP}:3000
+<<<<<<< HEAD
           DATABASE_HOST=${RDS_HOST}
+=======
+          DATABASE_HOST=${RDS_ENDPOINT}
+>>>>>>> b9db48a99306daf21ea133c9e59e5a5c4911d5df
           DATABASE_PORT=5432
           DATABASE_USER=${DATABASE_USER}
           DATABASE_PASSWORD=${DATABASE_PASSWORD}
@@ -273,6 +325,7 @@ jobs:
           ssh -i ~/.ssh/aws_key -o StrictHostKeyChecking=no ec2-user@${EC2_IP} << 'DEPLOY_SCRIPT'
             set -e
             cd /home/ec2-user/app
+<<<<<<< HEAD
             
             # Extrair e limpar
             tar -xzf deploy.tar.gz
@@ -314,6 +367,18 @@ jobs:
             echo ""
             echo "=== Teste local ==="
             curl -v http://localhost:3000/api-docs 2>&1 | head -10 || echo "Falha no teste local"
+=======
+            tar -xzf deploy.tar.gz
+            rm deploy.tar.gz
+            # Garantir que Docker está rodando
+            sudo systemctl start docker || true
+            docker-compose -f docker-compose.prod.yml down || true
+            docker-compose -f docker-compose.prod.yml up -d --build
+            docker image prune -f
+            # Verificar se container está rodando
+            sleep 10
+            docker ps
+>>>>>>> b9db48a99306daf21ea133c9e59e5a5c4911d5df
           DEPLOY_SCRIPT
           
           echo "✅ Deploy concluído! API disponível em: http://${EC2_IP}:3000"
@@ -403,8 +468,27 @@ jobs:
       - name: Get EC2 IP and RDS Endpoint
         id: terraform_output
         run: |
+<<<<<<< Updated upstream
           EC2_IP=$(terraform -chdir=./terraform/environments/prod output -raw -no-color ec2_public_ip 2>/dev/null | tr -d '\n')
           RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/prod output -raw -no-color rds_endpoint 2>/dev/null | tr -d '\n')
+=======
+<<<<<<< HEAD
+          # Capturar output do terraform e limpar mensagens de debug
+          TERRAFORM_OUTPUT_IP=$(terraform -chdir=./terraform/environments/prod output -raw -no-color ec2_public_ip 2>&1)
+          TERRAFORM_OUTPUT_RDS=$(terraform -chdir=./terraform/environments/prod output -raw -no-color rds_endpoint 2>&1)
+          
+          # Extrair apenas o IP (última linha que parece um IP)
+          EC2_IP=$(echo "$TERRAFORM_OUTPUT_IP" | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | tail -1)
+          RDS_ENDPOINT=$(echo "$TERRAFORM_OUTPUT_RDS" | grep -v "::debug::" | grep -v "Terraform exited" | grep -v "stdout:" | grep -v "stderr:" | grep -v "exitcode:" | grep -v "^\[" | tail -1 | tr -d '\n' | tr -d '\r' | xargs)
+          
+          # Validar que obtivemos um IP válido
+          if [[ -z "$EC2_IP" ]] || [[ ! "$EC2_IP" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "❌ ERRO: IP inválido obtido: '${EC2_IP}'"
+            echo "Output completo: ${TERRAFORM_OUTPUT_IP}"
+            exit 1
+          fi
+          
+>>>>>>> Stashed changes
           echo "ec2_ip=${EC2_IP}" >> $GITHUB_OUTPUT
           echo "rds_endpoint=${RDS_ENDPOINT}" >> $GITHUB_OUTPUT
 
@@ -513,6 +597,27 @@ jobs:
             fi
             exit 1
           fi
+=======
+          EC2_IP=$(terraform -chdir=./terraform/environments/prod output -raw -no-color ec2_public_ip 2>/dev/null | tr -d '\n')
+          RDS_ENDPOINT=$(terraform -chdir=./terraform/environments/prod output -raw -no-color rds_endpoint 2>/dev/null | tr -d '\n')
+          echo "ec2_ip=${EC2_IP}" >> $GITHUB_OUTPUT
+          echo "rds_endpoint=${RDS_ENDPOINT}" >> $GITHUB_OUTPUT
+
+      - name: Setup SSH
+        run: |
+          # A chave privada já foi gerada no step "Generate SSH Key Pair"
+          ssh-keyscan -H ${{ steps.terraform_output.outputs.ec2_ip }} >> ~/.ssh/known_hosts
+          # Aguardar EC2 estar pronta para SSH (pode levar alguns segundos após criação)
+          echo "Aguardando EC2 estar pronta para SSH..."
+          for i in {1..30}; do
+            if ssh -i ~/.ssh/aws_key -o ConnectTimeout=5 -o StrictHostKeyChecking=no ec2-user@${{ steps.terraform_output.outputs.ec2_ip }} "echo 'EC2 pronta!'" 2>/dev/null; then
+              echo "EC2 está pronta!"
+              break
+            fi
+            echo "Tentativa $i/30 - aguardando..."
+            sleep 10
+          done
+>>>>>>> b9db48a99306daf21ea133c9e59e5a5c4911d5df
 
       - name: Deploy to EC2
         env:
@@ -523,14 +628,21 @@ jobs:
           DATABASE_NAME: ${{ secrets.DATABASE_NAME || 'teddydb' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
+<<<<<<< HEAD
           RDS_HOST=$(echo "${RDS_ENDPOINT}" | cut -d: -f1)
           
+=======
+>>>>>>> b9db48a99306daf21ea133c9e59e5a5c4911d5df
           # Criar .env no EC2
           ssh -i ~/.ssh/aws_key ec2-user@${EC2_IP} "mkdir -p /home/ec2-user/app && cat > /home/ec2-user/app/.env << EOF
           NODE_ENV=production
           PORT=3000
           BASE_URL=http://${EC2_IP}:3000
+<<<<<<< HEAD
           DATABASE_HOST=${RDS_HOST}
+=======
+          DATABASE_HOST=${RDS_ENDPOINT}
+>>>>>>> b9db48a99306daf21ea133c9e59e5a5c4911d5df
           DATABASE_PORT=5432
           DATABASE_USER=${DATABASE_USER}
           DATABASE_PASSWORD=${DATABASE_PASSWORD}
@@ -557,8 +669,19 @@ jobs:
             # Verificar se container está rodando
             sleep 10
             docker ps
+<<<<<<< HEAD
             echo "=== Logs do container ==="
             docker logs --tail 50 teddy-backend-app || true
           DEPLOY_SCRIPT
           
+<<<<<<< Updated upstream
           echo "✅ Deploy concluído! API disponível em: http://${EC2_IP}:3000"
+=======
+          echo "✅ Deploy concluído! API disponível em: http://${EC2_IP}:3000"
+>>>>>>> Stashed changes
+=======
+          DEPLOY_SCRIPT
+          
+          echo "✅ Deploy concluído! API disponível em: http://${EC2_IP}:3000"
+>>>>>>> b9db48a99306daf21ea133c9e59e5a5c4911d5df
+>>>>>>> Stashed changes
