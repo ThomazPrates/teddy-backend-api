@@ -11,8 +11,8 @@ API REST para encurtamento de URLs desenvolvida com NestJS, permitindo que usuá
 **Documentação Swagger**: [http://98.91.251.41:3000/api-docs](http://98.91.251.41:3000/api-docs)
 
 ### 🏭 Ambiente de Produção (PROD)
-**URL**: [http://000.000.000.000:3000/](http://000.000.000.000:3000/)  
-**Documentação Swagger**: [http://000.000.000.000:3000/api-docs](http://000.000.000.000:3000/api-docs)
+**URL**: [http://54.152.194.168:3000/](http://54.152.194.168:3000/)  
+**Documentação Swagger**: [http://54.152.194.168:3000/api-docs](http://54.152.194.168:3000/api-docs)
 
 ---
 
