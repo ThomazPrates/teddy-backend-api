@@ -339,8 +339,19 @@ jobs:
             # Parar containers existentes
             docker-compose -f docker-compose.prod.yml down || true
             
-            # Build e start
-            docker-compose -f docker-compose.prod.yml up -d --build
+            # Build separado do up para evitar problemas com buildx
+            # Desabilitar buildx se não estiver disponível
+            export DOCKER_BUILDKIT=0
+            export COMPOSE_DOCKER_CLI_BUILD=0
+            
+            echo "🔨 Fazendo build da imagem..."
+            docker-compose -f docker-compose.prod.yml build --no-cache || {
+              echo "⚠️ Build com docker-compose falhou, tentando com docker build direto..."
+              docker build -t teddy-backend-api:latest -f Dockerfile .
+            }
+            
+            echo "🚀 Iniciando containers..."
+            docker-compose -f docker-compose.prod.yml up -d
             
             # Limpar imagens antigas
             docker image prune -f
